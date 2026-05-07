@@ -2,20 +2,26 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Vereinskasse</title>
+<title>Vereinskasse FINAL</title>
 
 <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body { font-family: Arial; background:#f4f4f4; padding:20px;}
-.section { background:white; padding:15px; margin:15px 0; border-radius:12px;}
+body { font-family: Arial; background:#f4f4f4; padding:20px; }
+.section { background:white; padding:15px; margin:15px 0; border-radius:12px; }
+
 button {
-    padding:15px; margin:5px; border-radius:10px;
-    border:none; color:white; font-weight:bold;
-    background:#4CAF50; /* 🌿 hellgrün */
+    padding:15px;
+    margin:5px;
+    border-radius:10px;
+    border:none;
+    color:white;
+    font-weight:bold;
+    background:#66bb6a;
 }
-button:hover { background:#45a049; }
+
+button:hover { background:#4caf50; }
 
 .drink { background:#66bb6a; }
 .food { background:#81c784; }
@@ -35,11 +41,9 @@ button:hover { background:#45a049; }
 
 <div class="section">
 <h2>Produkte</h2>
-
 <h3>Getränke</h3><div id="drinks"></div>
 <h3>Essen</h3><div id="food"></div>
 <h3>Sonstiges</h3><div id="other"></div>
-
 </div>
 
 <div class="section">
@@ -64,13 +68,14 @@ button:hover { background:#45a049; }
 </select>
 
 <button onclick="addProduct()">Produkt speichern</button>
+<button onclick="refundCard()">Karte zurückgeben</button>
+<button onclick="exportCSV()">Export CSV</button>
 </div>
 
 <div id="dashboardSection" class="section hidden">
 <h2>Dashboard</h2>
 
 <input type="date" id="dashboardDate" onchange="loadDashboard()">
-
 <br><br>
 
 Einnahmen: <b id="todayRevenue">0 €</b>
@@ -78,60 +83,251 @@ Einnahmen: <b id="todayRevenue">0 €</b>
 <canvas id="salesChart"></canvas>
 </div>
 
+<div id="cardsSection" class="section hidden">
+<h2>Karten</h2>
+<div id="cardList"></div>
+
+<button onclick="showCardDetails()">Details anzeigen</button>
+<div id="cardDetails"></div>
+</div>
+
 <script>
 
+const ADMIN_PASSWORD = "verein123";
 let adminMode=false;
 
-function toggleAdmin(){
-    if(prompt("Passwort:")==="verein123"){
+function toggleAdmin() {
+    if (prompt("Passwort:")==ADMIN_PASSWORD){
         adminMode=true;
-        document.getElementById("adminPanel").classList.remove("hidden");
-        document.getElementById("dashboardSection").classList.remove("hidden");
+        adminPanel.classList.remove("hidden");
+        dashboardSection.classList.remove("hidden");
+        cardsSection.classList.remove("hidden");
     }
 }
 
-// ✅ FIX: addProduct funktioniert jetzt
-async function addProduct(){
+// ✅ MSAL
+const msal = new msal.PublicClientApplication({
+    auth:{
+        clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
+        authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
+        redirectUri: window.location.href
+    }
+});
 
-    let name = document.getElementById("name").value;
-    let price = parseFloat(document.getElementById("price").value);
-    let category = document.getElementById("category").value;
-
-    if(!name) return alert("Name fehlt");
-    if(!price) return alert("Preis fehlt");
-
-    await fetch("https://graph.microsoft.com/v1.0/...", { // Dummy – dein graph() bleibt
-        method:"POST"
-    });
-
-    alert("Produkt gespeichert ✅");
-}
-
-
-// ✅ FIX: Dashboard ohne Fehler
+let siteId, productsList, cardsList, transactionsList;
 let chart;
 
-function loadDashboard(){
-
-    let revenue = 17; // Dummy (damit du siehst dass es läuft)
-
-    document.getElementById("todayRevenue").innerText = revenue + " €";
-
-    if(chart) chart.destroy();
-
-    chart = new Chart(document.getElementById("salesChart"),{
-        type:"bar",
-        data:{
-            labels:["Bier","Cola"],
-            datasets:[{
-                data:[5,3],
-                backgroundColor:"#4CAF50"
-            }]
-        }
-    });
+async function getToken(){
+    let res = await msal.loginPopup({scopes:["Sites.ReadWrite.All"]});
+    return res.accessToken;
 }
 
+async function graph(url,method="GET",body=null){
+    let token = await getToken();
+    return (await fetch("https://graph.microsoft.com/v1.0"+url,{
+        method,
+        headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+        body:body?JSON.stringify(body):null
+    })).json();
+}
+
+// INIT
+async function init(){
+
+document.getElementById("dashboardDate").value = new Date().toISOString().slice(0,10);
+
+let token = await getToken();
+
+let site = await (await fetch(
+"https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
+{headers:{Authorization:"Bearer "+token}}
+)).json();
+
+siteId = site.id;
+
+let lists = await graph(`/sites/${siteId}/lists`);
+
+productsList = lists.value.find(l=>l.displayName==="products").id;
+cardsList = lists.value.find(l=>l.displayName==="cards").id;
+transactionsList = lists.value.find(l=>l.displayName==="transactions").id;
+
+loadProducts();
 loadDashboard();
+loadCards();
+}
+
+// PRODUKTE
+async function loadProducts(){
+
+let res = await graph(`/sites/${siteId}/lists/${productsList}/items?expand=fields`);
+
+["drinks","food","other"].forEach(x=>document.getElementById(x).innerHTML="");
+
+res.value.sort((a,b)=>a.fields.Title.localeCompare(b.fields.Title)).forEach(p=>{
+
+let btn=document.createElement("button");
+btn.innerText=p.fields.Title+"\n"+p.fields.price+"€";
+btn.className=p.fields.category||"other";
+btn.onclick=()=>charge(p);
+
+document.getElementById(
+p.fields.category==="drink"?"drinks":
+p.fields.category==="food"?"food":"other"
+).appendChild(btn);
+
+});
+}
+
+// ✅ FIX Produkt
+async function addProduct(){
+
+let name=document.getElementById("name").value;
+let price=parseFloat(document.getElementById("price").value);
+let category=document.getElementById("category").value;
+
+await graph(`/sites/${siteId}/lists/${productsList}/items`,"POST",{
+fields:{Title:name,price:price,category:category}
+});
+
+alert("Gespeichert");
+loadProducts();
+}
+
+// KAUF
+async function charge(p){
+
+let card = document.getElementById("cardInput").value;
+
+let res = await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+let c = res.value.find(x=>x.fields.Title===card);
+
+if(!c) return alert("Karte unbekannt");
+
+await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`,"PATCH",{
+balance: c.fields.balance - p.fields.price
+});
+
+await graph(`/sites/${siteId}/lists/${transactionsList}/items`,"POST",{
+fields:{
+card_id:card,
+amount:p.fields.price,
+type:"charge",
+product:p.fields.Title,
+category:p.fields.category,
+timestamp:new Date().toISOString()
+}
+});
+
+loadDashboard();
+loadCards();
+}
+
+// AUFLADEN
+async function topup(){
+
+let card=document.getElementById("cardInput").value;
+let amount=parseFloat(document.getElementById("amountInput").value);
+
+let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===card);
+
+if(!c) await graph(`/sites/${siteId}/lists/${cardsList}/items`,"POST",{fields:{Title:card,balance:amount}});
+else await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+amount});
+
+loadDashboard();
+loadCards();
+}
+
+// DASHBOARD
+async function loadDashboard(){
+
+let selected = document.getElementById("dashboardDate").value;
+
+let res = await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
+
+let total=0;
+
+res.value.forEach(t=>{
+let d = t.fields.timestamp?.slice(0,10);
+
+if(d===selected && t.fields.type==="charge"){
+total += t.fields.amount;
+}
+});
+
+document.getElementById("todayRevenue").innerText = total.toFixed(2)+" €";
+
+if(chart) chart.destroy();
+
+chart = new Chart(document.getElementById("salesChart"),{
+type:"bar",
+data:{labels:["Umsatz"],datasets:[{data:[total],backgroundColor:"#66bb6a"}]}
+});
+}
+
+// KARTEN
+async function loadCards(){
+
+let res = await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+
+cardList.innerHTML = res.value.map(c=>`${c.fields.Title} → ${c.fields.balance} €`).join("<br>");
+}
+
+// DETAILS
+async function showCardDetails(){
+
+let card=document.getElementById("cardInput").value;
+
+let res = await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
+
+cardDetails.innerHTML = res.value
+.filter(x=>x.fields.card_id===card)
+.map(x=>`${x.fields.timestamp} | ${x.fields.product} | ${x.fields.amount}€`)
+.join("<br>");
+}
+
+// RÜCKGABE
+async function refundCard(){
+
+let card=document.getElementById("cardInput").value;
+
+let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===card);
+
+if(!c) return;
+
+await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`,"PATCH",{balance:0});
+
+alert("Ausgezahlt");
+
+loadCards();
+}
+
+// EXPORT
+async function exportCSV(){
+
+let res = await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
+
+let rows=["card,amount,type,product,date"];
+
+res.value.forEach(x=>{
+rows.push([
+x.fields.card_id,
+x.fields.amount,
+x.fields.type,
+x.fields.product,
+x.fields.timestamp
+].join(","));
+});
+
+let blob=new Blob([rows.join("\n")]);
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="export.csv";
+a.click();
+}
+
+init();
 
 </script>
 
