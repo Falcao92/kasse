@@ -112,8 +112,9 @@ async function init() {
     let lists = await graph(`/sites/${siteId}/lists`);
     console.log("LISTS:", lists);
 
-    productsList = lists.value.find(l => l.name === "products")?.id;
-    cardsList = lists.value.find(l => l.name === "cards")?.id;
+   productsList = lists.value.find(l => l.displayName === "products")?.id;
+cardsList = lists.value.find(l => l.displayName === "cards")?.id;
+
 
     console.log("ProductsList:", productsList);
     console.log("CardsList:", cardsList);
