@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <title>Vereinskasse</title>
 
-<script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js>
+https://cdn.jsdelivr.net/npm/chart.jsscript>
 
 <style>
 body { font-family: Arial; background:#f4f4f4; padding:20px;}
-.section { background:white; padding:15px; margin:15px 0; border-radius:12px; }
+.section { background:white; padding:15px; margin:15px 0; border-radius:12px;}
 
 button {
     padding:12px;
@@ -21,7 +21,6 @@ button {
     font-weight:bold;
     cursor:pointer;
 }
-
 button:hover { background:#5ccf74; }
 
 .cardItem {
@@ -96,7 +95,7 @@ button:hover { background:#5ccf74; }
 </div>
 
 <div id="dashboardBox" class="section hidden">
-<h2>Dashboard</h2>
+<h2>📊 Dashboard</h2>
 
 <input type="date" id="date" onchange="loadDashboard()">
 
@@ -109,7 +108,7 @@ button:hover { background:#5ccf74; }
 </div>
 
 <div id="cardsBox" class="section hidden">
-<h2>Karten</h2>
+<h2>💳 Karten</h2>
 <div id="cards"></div>
 
 <h3>Details</h3>
@@ -178,7 +177,7 @@ loadCards();
 loadDashboard();
 }
 
-// PRODUKTE
+// ✅ PRODUKTE
 async function loadProducts(){
 
 let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
@@ -200,6 +199,7 @@ else document.getElementById("other").appendChild(btn);
 });
 }
 
+// ✅ PRODUKT
 async function addProduct(){
 
 let name=document.getElementById("name").value;
@@ -214,7 +214,7 @@ alert("Gespeichert ✅");
 loadProducts();
 }
 
-// VERKAUF
+// ✅ VERKAUF
 async function charge(p){
 
 let card=document.getElementById("card").value;
@@ -243,14 +243,14 @@ loadDashboard();
 loadCards();
 }
 
-// DASHBOARD
+// ✅ DASHBOARD (FIXED!)
 async function loadDashboard(){
 
 let d=document.getElementById("date").value;
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-let sum=0,drink=0,food=0,other=0;
+let sum=0, drink=0, food=0, other=0;
 
 res.value.forEach(x=>{
 if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
@@ -262,11 +262,13 @@ else other++;
 }
 });
 
-sumElem.textContent=sum+" €";
-drinkSum.textContent=drink;
-foodSum.textContent=food;
-otherSum.textContent=other;
+// ✅ FIX: KEINE direkten Variablen mehr!
+document.getElementById("sum").textContent=sum+" €";
+document.getElementById("drinkSum").textContent=drink;
+document.getElementById("foodSum").textContent=food;
+document.getElementById("otherSum").textContent=other;
 
+// Chart
 if(chart) chart.destroy();
 
 chart=new Chart(document.getElementById("chart"),{
@@ -281,7 +283,7 @@ backgroundColor:["#81c784","#ffb74d","#bdbdbd"]
 });
 }
 
-// KARTEN
+// ✅ KARTEN
 async function loadCards(){
 
 let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
@@ -292,7 +294,7 @@ cards.innerHTML=res.value.map(c=>`
 </div>`).join("");
 }
 
-// DETAILS (PROFI VERSION)
+// ✅ DETAILS
 async function showDetails(cardId){
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
@@ -309,9 +311,6 @@ let date=new Date(x.fields.timestamp).toLocaleString("de-DE");
 
 let color="#2196F3";
 let label="Kauf";
-
-if(x.fields.type==="topup"){color="#4CAF50";label="Aufladung";}
-if(x.fields.type==="refund"){color="#f44336";label="Auszahlung";}
 
 html+=`
 <div class="tx" style="border-left-color:${color}">
@@ -351,6 +350,5 @@ loadCards();
 init();
 
 </script>
-
 </body>
 </html>
