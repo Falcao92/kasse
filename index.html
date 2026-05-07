@@ -137,23 +137,28 @@ Bis: <input type="date" id="toDate">
 <script>
 let currentUser = null;
 
-async function loginM365(){
+    async function loginM365(){
 
-    let result = await msalInstance.loginPopup({
-        scopes:["Sites.ReadWrite.All", "User.Read"]
-    });
+    // wenn kein Account → Redirect Login starten
+    let accounts = msalInstance.getAllAccounts();
 
-    currentUser = result.account;
-
-    // ✅ OPTIONAL: nur bestimmte Nutzer erlauben
-    if(!currentUser.username.endsWith("@deinverein.de")){
-        alert("Kein Zugriff!");
-        document.body.innerHTML = "❌ Zugriff verweigert";
-        return;
+    if(accounts.length === 0){
+        await msalInstance.loginRedirect({
+            scopes:["Sites.ReadWrite.All","User.Read"]
+        });
+        return; // stop → Seite lädt danach neu
     }
 
-    console.log("Eingeloggt als:", currentUser.username);
+    // wenn eingeloggt
+    currentUser = accounts[0];
+
+    console.log("Eingeloggt:", currentUser.username);
+
+    document.getElementById("userInfo")?.innerText =
+        "👤 " + currentUser.username;
 }
+
+
 const ADMIN_PASSWORD="1234";
 let adminMode=false;
 let chart;
@@ -349,6 +354,7 @@ async function token(){
     return response.accessToken;
 }
 
+
     
 async function charge(p){
 
@@ -458,6 +464,10 @@ async function charge(p){
     
 
 async function init(){
+    
+    // ✅ Redirect Antwort verarbeiten
+    await msalInstance.handleRedirectPromise();
+
 await loginM365();  // ✅ NEU
 date.value=new Date().toISOString().slice(0,10);
 fromDate.value=date.value;
