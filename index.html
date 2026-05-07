@@ -10,7 +10,7 @@
 <style>
 body { font-family: Arial; background:#f4f4f4; padding:20px; }
 .section { background:white; padding:15px; margin:15px 0; border-radius:12px; }
-button { padding:15px; margin:5px; border-radius:10px; border:none; color:white; }
+button { padding:15px; margin:5px; border-radius:10px; border:none; color:white; font-weight:bold; }
 .drink { background:#0078d4; }
 .food { background:#d83b01; }
 .other { background:#107c10; }
@@ -23,7 +23,7 @@ button { padding:15px; margin:5px; border-radius:10px; border:none; color:white;
 <h1>Vereinskasse</h1>
 
 <div class="section">
-<input id="card" placeholder="Karte scannen">
+<input id="cardInput" placeholder="Karte scannen">
 </div>
 
 <div class="section">
@@ -34,7 +34,7 @@ button { padding:15px; margin:5px; border-radius:10px; border:none; color:white;
 </div>
 
 <div class="section">
-<input id="amount" placeholder="Betrag">
+<input id="amountInput" placeholder="Betrag">
 <button onclick="topup()">Aufladen</button>
 </div>
 
@@ -44,6 +44,7 @@ button { padding:15px; margin:5px; border-radius:10px; border:none; color:white;
 
 <div id="adminPanel" class="section hidden">
 <h2>Admin</h2>
+
 <input id="name" placeholder="Produkt">
 <input id="price" placeholder="Preis">
 
@@ -60,12 +61,8 @@ button { padding:15px; margin:5px; border-radius:10px; border:none; color:white;
 <div id="dashboardSection" class="section hidden">
 <h2>📊 Dashboard</h2>
 
-Datum:
 <input type="date" id="dashboardDate" onchange="loadDashboard()">
-
-<br><br>
-
-<button onclick="exportCSV()">📥 Export CSV</button>
+<button onclick="exportCSV()">CSV Export</button>
 
 <br><br>
 
@@ -92,12 +89,13 @@ let adminMode = false;
 function toggleAdmin() {
     if (prompt("Passwort:") === ADMIN_PASSWORD) {
         adminMode = true;
-        adminPanel.classList.remove("hidden");
-        dashboardSection.classList.remove("hidden");
-        cardsSection.classList.remove("hidden");
-    }
+        document.getElementById("adminPanel").classList.remove("hidden");
+        document.getElementById("dashboardSection").classList.remove("hidden");
+        document.getElementById("cardsSection").classList.remove("hidden");
+    } else alert("Falsches Passwort");
 }
 
+// MSAL
 const msalConfig = {
     auth: {
         clientId: "844062e7-0d5c-4852-88fc-5e9940f4ed66",
@@ -111,15 +109,15 @@ const msalInstance = new msal.PublicClientApplication(msalConfig);
 let siteId, productsList, cardsList, transactionsList;
 let salesChart, categoryChart;
 
-async function getToken() {
-    const request = { scopes:["User.Read","Sites.ReadWrite.All"] };
-    let acc = msalInstance.getAllAccounts();
-    if (acc.length===0) return (await msalInstance.loginPopup(request)).accessToken;
-    return (await msalInstance.acquireTokenSilent({ ...request, account:acc[0]})).accessToken;
+async function getToken(){
+    let req={scopes:["User.Read","Sites.ReadWrite.All"]};
+    let acc=msalInstance.getAllAccounts();
+    if(acc.length===0)return (await msalInstance.loginPopup(req)).accessToken;
+    return (await msalInstance.acquireTokenSilent({...req,account:acc[0]})).accessToken;
 }
 
 async function graph(url,method="GET",body=null){
-    const token=await getToken();
+    let token=await getToken();
     return (await fetch("https://graph.microsoft.com/v1.0"+url,{
         method,
         headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
@@ -132,12 +130,14 @@ async function init(){
 document.getElementById("dashboardDate").value=new Date().toISOString().slice(0,10);
 
 let token=await getToken();
+
 let site=await (await fetch(
 "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
 {headers:{Authorization:"Bearer "+token}}
 )).json();
 
 siteId=site.id;
+
 let lists=await graph(`/sites/${siteId}/lists`);
 
 productsList=lists.value.find(l=>l.displayName==="products").id;
@@ -149,21 +149,25 @@ loadDashboard();
 loadCards();
 }
 
+// PRODUKTE
 async function loadProducts(){
+
 let res=await graph(`/sites/${siteId}/lists/${productsList}/items?expand=fields`);
 
 ["drinks","food","other"].forEach(x=>document.getElementById(x).innerHTML="");
 
 res.value.sort((a,b)=>a.fields.Title.localeCompare(b.fields.Title)).forEach(p=>{
+
 let btn=document.createElement("button");
 btn.innerText=p.fields.Title+"\n"+p.fields.price+"€";
 btn.className=p.fields.category||"other";
 btn.onclick=()=>charge(p);
 
+// admin edit/delete
 if(adminMode){
 btn.oncontextmenu=e=>{
 e.preventDefault();
-if(confirm("OK=ändern, ABbrechen=löschen")) editProduct(p);
+if(confirm("OK=Preis ändern, Abbrechen=löschen")) editProduct(p);
 else deleteProduct(p);
 };
 }
@@ -172,37 +176,85 @@ document.getElementById(
 p.fields.category==="drink"?"drinks":
 p.fields.category==="food"?"food":"other"
 ).appendChild(btn);
+
 });
 }
 
+// PRODUKT FIX
+async function addProduct(){
+
+let name=document.getElementById("name").value;
+let price=parseFloat(document.getElementById("price").value);
+let category=document.getElementById("category").value;
+
+if(!name) return alert("Name fehlt");
+if(!price||isNaN(price)) return alert("Preis falsch");
+
+await graph(`/sites/${siteId}/lists/${productsList}/items`,"POST",{
+fields:{Title:name,price:price,category:category}
+});
+
+alert("Gespeichert");
+
+document.getElementById("name").value="";
+document.getElementById("price").value="";
+
+loadProducts();
+}
+
+async function editProduct(item){
+
+let p=prompt("Neuer Preis",item.fields.price);
+if(!p)return;
+
+await graph(`/sites/${siteId}/lists/${productsList}/items/${item.id}/fields`,"PATCH",{price:parseFloat(p)});
+
+loadProducts();
+}
+
+async function deleteProduct(item){
+
+if(!confirm("Wirklich löschen?"))return;
+
+let token=await getToken();
+
+await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${productsList}/items/${item.id}`,{
+method:"DELETE",
+headers:{Authorization:"Bearer "+token}
+});
+
+loadProducts();
+}
+
+// KASSE
 async function charge(p){
-let card=cardInput.value;
+
+let card=document.getElementById("cardInput").value;
+
 let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
 let c=res.value.find(x=>x.fields.Title===card);
 
-if(!c)return alert("Unbekannt");
-if(c.fields.balance<p.fields.price)return alert("Zu wenig");
+if(!c)return alert("Karte unbekannt");
+if(c.fields.balance<p.fields.price)return alert("Zu wenig Guthaben");
 
 await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance-p.fields.price});
 
-await graph(`/sites/${siteId}/lists/${transactionsList}/items`,"POST",{
-fields:{
+await graph(`/sites/${siteId}/lists/${transactionsList}/items`,"POST",{fields:{
 card_id:card,
 amount:p.fields.price,
 type:"charge",
 product:p.fields.Title,
 category:p.fields.category,
 timestamp:new Date().toISOString()
-}
-});
+}});
 
-loadDashboard();
-loadCards();
+loadDashboard(); loadCards();
 }
 
 async function topup(){
-let card=cardInput.value;
-let amount=parseFloat(amount.value);
+
+let card=document.getElementById("cardInput").value;
+let amount=parseFloat(document.getElementById("amountInput").value);
 
 let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
 let c=res.value.find(x=>x.fields.Title===card);
@@ -210,31 +262,25 @@ let c=res.value.find(x=>x.fields.Title===card);
 if(!c) await graph(`/sites/${siteId}/lists/${cardsList}/items`,"POST",{fields:{Title:card,balance:amount}});
 else await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+amount});
 
-loadDashboard();
+loadDashboard(); loadCards();
 }
 
-async function refundCard(){
-let card=cardInput.value;
-let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
-let c=res.value.find(x=>x.fields.Title===card);
-if(!c)return;
-if(!confirm("Auszahlen "+c.fields.balance))return;
-
-await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`,"PATCH",{balance:0});
-loadCards();
-loadDashboard();
-}
-
+// DASHBOARD
 async function loadDashboard(){
+
 let date=document.getElementById("dashboardDate").value;
+
 let res=await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
 
 let total=0,day=0,products={},cats={};
 
 res.value.forEach(t=>{
+
 let d=t.fields.timestamp?.slice(0,10);
+
 if(t.fields.type==="charge"){
 total+=t.fields.amount;
+
 if(d===date){
 day+=t.fields.amount;
 products[t.fields.product]=(products[t.fields.product]||0)+1;
@@ -246,35 +292,47 @@ cats[t.fields.category]=(cats[t.fields.category]||0)+t.fields.amount;
 todayRevenue.innerText=day.toFixed(2)+" €";
 totalRevenue.innerText=total.toFixed(2)+" €";
 
+// charts
 if(salesChart)salesChart.destroy();
 if(categoryChart)categoryChart.destroy();
 
-salesChart=new Chart(salesChartCanvas,{type:"bar",
+salesChart=new Chart(document.getElementById("salesChart"),{
+type:"bar",
 data:{labels:Object.keys(products),datasets:[{data:Object.values(products)}]}
 });
 
-categoryChart=new Chart(categoryChartCanvas,{type:"pie",
+categoryChart=new Chart(document.getElementById("categoryChart"),{
+type:"pie",
 data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats)}]}
 });
 }
 
+// KARTEN
 async function loadCards(){
+
 let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
-cardList.innerHTML=res.value.map(c=>`${c.fields.Title} → ${c.fields.balance}€`).join("<br>");
+
+cardList.innerHTML=res.value
+.sort((a,b)=>b.fields.balance-a.fields.balance)
+.map(c=>`${c.fields.Title} → ${c.fields.balance}€`)
+.join("<br>");
 }
 
 async function showCardDetails(){
-let card=cardInput.value;
+
+let card=document.getElementById("cardInput").value;
+
 let res=await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
 
 cardDetails.innerHTML=res.value
 .filter(x=>x.fields.card_id===card)
-.map(x=>`${x.fields.timestamp} - ${x.fields.type} - ${x.fields.amount}€`)
+.map(x=>`${x.fields.timestamp} | ${x.fields.type} | ${x.fields.amount}€`)
 .join("<br>");
 }
 
-// ✅ EXPORT CSV
+// EXPORT
 async function exportCSV(){
+
 let date=document.getElementById("dashboardDate").value;
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
