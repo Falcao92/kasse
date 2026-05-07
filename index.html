@@ -162,7 +162,109 @@ redirectUri:window.location.href
 });
 
 let siteId, productsId, cardsId, transactionsId;
+    
+async function topup(){
 
+    let cardVal = document.getElementById("card").value;
+    let amountVal = parseFloat(document.getElementById("amount").value);
+
+    if(!cardVal || !amountVal){
+        alert("Karte oder Betrag fehlt");
+        return;
+    }
+
+    // Popup zur Bestätigung
+    if(!confirm(`Aufladen bestätigen?\n${amountVal} €`)){
+        return;
+    }
+
+    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+    let c = res.value.find(x=>x.fields.Title === cardVal);
+
+    if(!c){
+        // neue Karte anlegen
+        await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{
+            fields:{
+                Title:cardVal,
+                balance:amountVal
+            }
+        });
+    } else {
+        // Guthaben erhöhen
+        await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
+            "PATCH",
+            {balance: c.fields.balance + amountVal}
+        );
+    }
+
+    // Transaktion speichern
+    await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
+        fields:{
+            card_id:cardVal,
+            amount:amountVal,
+            type:"topup",
+            product:"Aufladung",
+            timestamp:new Date().toISOString()
+        }
+    });
+
+    showToast("💰 Aufgeladen: " + amountVal + "€");
+
+    loadCards();
+}
+    async function refundCard(){
+
+    let cardVal = document.getElementById("card").value;
+
+    if(!cardVal){
+        alert("Karte fehlt");
+        return;
+    }
+
+    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+    let c = res.value.find(x=>x.fields.Title === cardVal);
+
+    if(!c){
+        alert("Karte nicht gefunden");
+        return;
+    }
+
+    let balance = c.fields.balance;
+
+    if(balance <= 0){
+        alert("Kein Guthaben vorhanden");
+        return;
+    }
+
+    // Popup bestätigen
+    if(!confirm(`Auszahlen?\n${balance} €`)){
+        return;
+    }
+
+    // Guthaben auf 0 setzen
+    await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
+        "PATCH",
+        {balance: 0}
+    );
+
+    // Transaktion speichern
+    await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
+        fields:{
+            card_id:cardVal,
+            amount:balance,
+            type:"refund",
+            product:"Auszahlung",
+            timestamp:new Date().toISOString()
+        }
+    });
+
+    showToast("💶 Auszahlung: " + balance + "€");
+
+    loadCards();
+    loadDashboard();
+}
+
+    
 async function token(){
 let acc=msalInstance.getAllAccounts();
 if(acc.length===0){
