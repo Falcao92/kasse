@@ -162,6 +162,56 @@ redirectUri:window.location.href
 });
 
 let siteId, productsId, cardsId, transactionsId;
+
+    async function exportCSV(){
+
+    let from = document.getElementById("fromDate").value;
+    let to = document.getElementById("toDate").value;
+
+    if(!from || !to){
+        alert("Bitte Zeitraum wählen");
+        return;
+    }
+
+    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+    let rows = [
+        "Karte,Produkt,Kategorie,Typ,Betrag,Zeit"
+    ];
+
+    res.value.forEach(x => {
+
+        let d = x.fields.timestamp?.slice(0,10);
+
+        if(!d) return;
+
+        if(d >= from && d <= to){
+
+            rows.push([
+                x.fields.card_id,
+                x.fields.product || "",
+                x.fields.category || "",
+                x.fields.type,
+                x.fields.amount,
+                x.fields.timestamp
+            ].join(","));
+        }
+    });
+
+    // CSV erzeugen
+    let blob = new Blob([rows.join("\n")], {type:"text/csv"});
+
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+
+    let filename = `export_${from}_bis_${to}.csv`;
+    a.download = filename;
+
+    a.click();
+
+    showToast("📥 Export erstellt");
+}
+
     
 async function topup(){
 
@@ -550,6 +600,12 @@ datasets:[{data:sorted.map(p=>p[1].sum),backgroundColor:"#7edc8a"}]
 }
 
 init();
+    
+ <hr>
+
+<h3>📥 Export</h3>
+
+<button onclick="exportCSV()">CSV Export</button>
 
 </script>
 </body>
