@@ -10,9 +10,47 @@
 <style>
 body { font-family: Arial; background:#f4f4f4; padding:20px;}
 .section { background:white; padding:15px; margin:15px 0; border-radius:12px;}
-button { padding:12px; margin:5px; border-radius:8px; border:none; background:#7edc8a; color:white; font-weight:bold;}
+
+button {
+    padding:12px;
+    margin:5px;
+    border-radius:8px;
+    border:none;
+    background:#7edc8a;
+    color:white;
+    font-weight:bold;
+    cursor:pointer;
+}
+
 button:hover { background:#5ccf74; }
-.hidden { display:none; }
+
+.cardItem {
+    display:flex;
+    justify-content:space-between;
+    padding:10px;
+    margin:6px 0;
+    border-radius:8px;
+    background:#fafafa;
+    cursor:pointer;
+    border:1px solid #ddd;
+}
+
+.tx {
+    padding:10px;
+    margin:5px 0;
+    border-left:5px solid;
+    background:#fafafa;
+    border-radius:6px;
+}
+
+/* Auszahlung Button */
+.payoutBtn {
+    background:#ff6b6b;
+}
+.payoutBtn:hover {
+    background:#e04848;
+}
+
 </style>
 </head>
 
@@ -43,11 +81,14 @@ button:hover { background:#5ccf74; }
 <button onclick="topup()">Aufladen</button>
 </div>
 
+<!-- ✅ AUSZAHLUNG EXTRA -->
 <div class="section">
-<button onclick="toggleAdmin()">Admin</button>
+<h2>💶 Auszahlung</h2>
+<button class="payoutBtn" onclick="refundCard()">Guthaben auszahlen</button>
 </div>
 
-<div id="admin" class="section hidden">
+<!-- ✅ ADMIN OHNE LOGIN -->
+<div class="section">
 <h2>Admin</h2>
 
 <input id="name" placeholder="Produkt">
@@ -60,11 +101,10 @@ button:hover { background:#5ccf74; }
 </select>
 
 <br>
-
 <button onclick="addProduct()">Produkt speichern</button>
 </div>
 
-<div id="dashboardBox" class="section hidden">
+<div class="section">
 <h2>📊 Dashboard</h2>
 
 <input type="date" id="date" onchange="loadDashboard()">
@@ -77,7 +117,7 @@ button:hover { background:#5ccf74; }
 <canvas id="chart"></canvas>
 </div>
 
-<div id="cardsBox" class="section hidden">
+<div class="section">
 <h2>💳 Karten</h2>
 <div id="cards"></div>
 
@@ -87,6 +127,7 @@ button:hover { background:#5ccf74; }
 
 <script>
 
+// ✅ MSAL
 const msalInstance = new msal.PublicClientApplication({
 auth:{
 clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
@@ -213,14 +254,67 @@ loadDashboard();
 loadCards();
 }
 
-// ✅ DASHBOARD (FIXED!)
+// ✅ AUFLADEN
+async function topup(){
+
+let card=document.getElementById("card").value;
+let amount=parseFloat(document.getElementById("amount").value);
+
+let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===card);
+
+if(!c){
+await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{fields:{Title:card,balance:amount}});
+}else{
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+amount});
+}
+
+loadCards();
+}
+
+// ✅ AUSZAHLUNG
+async function refundCard(){
+
+let card=document.getElementById("card").value;
+
+let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===card);
+
+if(!c) return alert("Karte nicht gefunden");
+
+let amount=c.fields.balance;
+
+if(amount<=0) return alert("Kein Guthaben");
+
+if(!confirm("Auszahlen: "+amount+" €?")) return;
+
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:0});
+
+// log
+await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
+fields:{
+card_id:card,
+amount:amount,
+type:"refund",
+product:"Auszahlung",
+timestamp:new Date().toISOString()
+}
+});
+
+alert("Ausgezahlt: "+amount+" €");
+
+loadCards();
+loadDashboard();
+}
+
+// ✅ DASHBOARD
 async function loadDashboard(){
 
 let d=document.getElementById("date").value;
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-let sum=0, drink=0, food=0, other=0;
+let sum=0,drink=0,food=0,other=0;
 
 res.value.forEach(x=>{
 if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
@@ -232,13 +326,11 @@ else other++;
 }
 });
 
-// ✅ FIX: KEINE direkten Variablen mehr!
 document.getElementById("sum").textContent=sum+" €";
 document.getElementById("drinkSum").textContent=drink;
 document.getElementById("foodSum").textContent=food;
 document.getElementById("otherSum").textContent=other;
 
-// Chart
 if(chart) chart.destroy();
 
 chart=new Chart(document.getElementById("chart"),{
@@ -264,7 +356,7 @@ cards.innerHTML=res.value.map(c=>`
 </div>`).join("");
 }
 
-// ✅ DETAILS
+// ✅ DETAILS (WIEDER VOLLSTÄNDIG)
 async function showDetails(cardId){
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
@@ -282,39 +374,20 @@ let date=new Date(x.fields.timestamp).toLocaleString("de-DE");
 let color="#2196F3";
 let label="Kauf";
 
+if(x.fields.type==="topup"){color="#4CAF50"; label="Aufladung";}
+if(x.fields.type==="refund"){color="#f44336"; label="Auszahlung";}
+
 html+=`
 <div class="tx" style="border-left-color:${color}">
 <b>${label}</b><br>
-${x.fields.product||""}<br>
+${x.fields.product || ""}<br>
 <small>${date}</small><br>
 <b>${x.fields.amount} €</b>
-</div>`;
+</div>
+`;
 });
 
-details.innerHTML=html;
-}
-
-function toggleAdmin(){
-admin.classList.remove("hidden");
-dashboardBox.classList.remove("hidden");
-cardsBox.classList.remove("hidden");
-}
-
-async function topup(){
-
-let card=document.getElementById("card").value;
-let amount=parseFloat(document.getElementById("amount").value);
-
-let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-let c=res.value.find(x=>x.fields.Title===card);
-
-if(!c){
-await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{fields:{Title:card,balance:amount}});
-}else{
-await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+amount});
-}
-
-loadCards();
+document.getElementById("details").innerHTML=html;
 }
 
 init();
