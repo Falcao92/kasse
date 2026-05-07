@@ -169,7 +169,7 @@ redirectUri:window.location.href
 
 let siteId, productsId, cardsId, transactionsId;
 
-    async function exportCSV(){
+  async function exportCSV(){
 
     let from = document.getElementById("fromDate").value;
     let to = document.getElementById("toDate").value;
@@ -181,15 +181,11 @@ let siteId, productsId, cardsId, transactionsId;
 
     let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-    let rows = [
-        "Karte,Produkt,Kategorie,Typ,Betrag,Zeit"
-    ];
+    let rows = ["Karte,Produkt,Kategorie,Typ,Betrag,Zeit"];
 
     res.value.forEach(x => {
 
         let d = x.fields.timestamp?.slice(0,10);
-
-        if(!d) return;
 
         if(d >= from && d <= to){
 
@@ -204,19 +200,17 @@ let siteId, productsId, cardsId, transactionsId;
         }
     });
 
-    // CSV erzeugen
     let blob = new Blob([rows.join("\n")], {type:"text/csv"});
 
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-
-    let filename = `export_${from}_bis_${to}.csv`;
-    a.download = filename;
-
+    a.download = `export_${from}_bis_${to}.csv`;
     a.click();
 
     showToast("📥 Export erstellt");
 }
+  
+
 
     
 async function topup(){
