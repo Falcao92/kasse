@@ -9,7 +9,7 @@
 
 <style>
 body { font-family: Arial; background:#f4f4f4; padding:20px;}
-.section { background:white; padding:15px; margin:15px 0; border-radius:12px;}
+.section { background:white; padding:15px; margin:15px 0; border-radius:12px; }
 
 button {
     padding:12px;
@@ -19,8 +19,29 @@ button {
     background:#7edc8a;
     color:white;
     font-weight:bold;
+    cursor:pointer;
 }
+
 button:hover { background:#5ccf74; }
+
+.cardItem {
+    display:flex;
+    justify-content:space-between;
+    padding:10px;
+    margin:6px 0;
+    border-radius:8px;
+    background:#fafafa;
+    cursor:pointer;
+    border:1px solid #ddd;
+}
+
+.tx {
+    padding:10px;
+    margin:5px 0;
+    border-left:5px solid;
+    background:#fafafa;
+    border-radius:6px;
+}
 
 .hidden { display:none; }
 </style>
@@ -72,7 +93,6 @@ button:hover { background:#5ccf74; }
 <br>
 
 <button onclick="addProduct()">Produkt speichern</button>
-<button onclick="refund()">Karte auszahlen</button>
 </div>
 
 <div id="dashboardBox" class="section hidden">
@@ -92,91 +112,86 @@ button:hover { background:#5ccf74; }
 <h2>Karten</h2>
 <div id="cards"></div>
 
-<button onclick="showDetails()">Details anzeigen</button>
+<h3>Details</h3>
 <div id="details"></div>
 </div>
 
 <script>
 
 const msalInstance = new msal.PublicClientApplication({
-    auth:{
-        clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
-        authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
-        redirectUri:window.location.href
-    }
+auth:{
+clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
+authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
+redirectUri:window.location.href
+}
 });
 
 let siteId, productsId, cardsId, transactionsId;
 let chart;
 
 async function token(){
-    let acc = msalInstance.getAllAccounts();
+let acc=msalInstance.getAllAccounts();
 
-    if(acc.length===0){
-        let login = await msalInstance.loginPopup({scopes:["Sites.ReadWrite.All"]});
-        return login.accessToken;
-    }
+if(acc.length===0){
+let login=await msalInstance.loginPopup({scopes:["Sites.ReadWrite.All"]});
+return login.accessToken;
+}
 
-    let t = await msalInstance.acquireTokenSilent({
-        scopes:["Sites.ReadWrite.All"],
-        account:acc[0]
-    });
-
-    return t.accessToken;
+let t=await msalInstance.acquireTokenSilent({
+scopes:["Sites.ReadWrite.All"],
+account:acc[0]
+});
+return t.accessToken;
 }
 
 async function graph(url,method="GET",body=null){
-    let t = await token();
+let t=await token();
 
-    return (await fetch("https://graph.microsoft.com/v1.0"+url,{
-        method,
-        headers:{
-            Authorization:"Bearer "+t,
-            "Content-Type":"application/json"
-        },
-        body:body?JSON.stringify(body):null
-    })).json();
+return(await fetch("https://graph.microsoft.com/v1.0"+url,{
+method,
+headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},
+body:body?JSON.stringify(body):null
+})).json();
 }
 
 async function init(){
 
-document.getElementById("date").value = new Date().toISOString().slice(0,10);
+document.getElementById("date").value=new Date().toISOString().slice(0,10);
 
-let t = await token();
+let t=await token();
 
-let site = await (await fetch(
+let site=await(await fetch(
 "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
 {headers:{Authorization:"Bearer "+t}}
 )).json();
 
-siteId = site.id;
+siteId=site.id;
 
-let lists = await graph(`/sites/${siteId}/lists`);
+let lists=await graph(`/sites/${siteId}/lists`);
 
-productsId = lists.value.find(l=>l.displayName==="products").id;
-cardsId = lists.value.find(l=>l.displayName==="cards").id;
-transactionsId = lists.value.find(l=>l.displayName==="transactions").id;
+productsId=lists.value.find(l=>l.displayName==="products").id;
+cardsId=lists.value.find(l=>l.displayName==="cards").id;
+transactionsId=lists.value.find(l=>l.displayName==="transactions").id;
 
 loadProducts();
 loadCards();
 loadDashboard();
 }
 
-// ✅ PRODUKTE
+// PRODUKTE
 async function loadProducts(){
 
-let res = await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
+let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
 
-["drink","food","other"].forEach(id => document.getElementById(id).innerHTML="");
+["drink","food","other"].forEach(x=>document.getElementById(x).innerHTML="");
 
-res.value.forEach(p => {
+res.value.forEach(p=>{
 
-let btn = document.createElement("button");
+let btn=document.createElement("button");
+btn.innerText=p.fields.Title+" "+(p.fields.price||0)+"€";
+btn.onclick=()=>charge(p);
 
-btn.innerText = p.fields.Title + " " + (p.fields.price||0) + "€";
-btn.onclick = () => charge(p);
-
-let cat = p.fields.category;
+let cat=p.fields.category;
 
 if(cat==="Getraenk") document.getElementById("drink").appendChild(btn);
 else if(cat==="Essen") document.getElementById("food").appendChild(btn);
@@ -185,7 +200,6 @@ else document.getElementById("other").appendChild(btn);
 });
 }
 
-// ✅ PRODUKT SPEICHERN
 async function addProduct(){
 
 let name=document.getElementById("name").value;
@@ -193,14 +207,14 @@ let price=parseFloat(document.getElementById("price").value);
 let category=document.getElementById("category").value;
 
 await graph(`/sites/${siteId}/lists/${productsId}/items`,"POST",{
-fields:{Title:name, price:price, category:category}
+fields:{Title:name,price:price,category:category}
 });
 
 alert("Gespeichert ✅");
 loadProducts();
 }
 
-// ✅ KAUF
+// VERKAUF
 async function charge(p){
 
 let card=document.getElementById("card").value;
@@ -219,7 +233,8 @@ fields:{
 card_id:card,
 amount:p.fields.price,
 type:"charge",
-category:p.fields.category,   // ✅ wichtig
+product:p.fields.Title,
+category:p.fields.category,
 timestamp:new Date().toISOString()
 }
 });
@@ -228,33 +243,30 @@ loadDashboard();
 loadCards();
 }
 
-// ✅ DASHBOARD (MIT KATEGORIEN)
+// DASHBOARD
 async function loadDashboard(){
 
 let d=document.getElementById("date").value;
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-let sum=0, drink=0, food=0, other=0;
+let sum=0,drink=0,food=0,other=0;
 
 res.value.forEach(x=>{
 if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
-
 sum+=x.fields.amount;
 
 if(x.fields.category==="Getraenk") drink++;
 else if(x.fields.category==="Essen") food++;
 else other++;
-
 }
 });
 
-document.getElementById("sum").innerText=sum+" €";
-document.getElementById("drinkSum").innerText=drink;
-document.getElementById("foodSum").innerText=food;
-document.getElementById("otherSum").innerText=other;
+sumElem.textContent=sum+" €";
+drinkSum.textContent=drink;
+foodSum.textContent=food;
+otherSum.textContent=other;
 
-// Chart
 if(chart) chart.destroy();
 
 chart=new Chart(document.getElementById("chart"),{
@@ -269,34 +281,72 @@ backgroundColor:["#81c784","#ffb74d","#bdbdbd"]
 });
 }
 
-// ✅ KARTEN
+// KARTEN
 async function loadCards(){
 
 let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
 
-cards.innerHTML=res.value.map(c=>c.fields.Title+" → "+c.fields.balance+"€").join("<br>");
+cards.innerHTML=res.value.map(c=>`
+<div class="cardItem" onclick="showDetails('${c.fields.Title}')">
+<b>${c.fields.Title}</b><span>${c.fields.balance} €</span>
+</div>`).join("");
 }
 
-// ✅ DETAILS
-async function showDetails(){
-
-let card=document.getElementById("card").value;
+// DETAILS (PROFI VERSION)
+async function showDetails(cardId){
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-details.innerHTML=res.value
-.filter(x=>x.fields.card_id===card)
-.map(x=>x.fields.timestamp+" "+x.fields.amount+"€")
-.join("<br>");
+let list=res.value
+.filter(x=>x.fields.card_id===cardId)
+.sort((a,b)=>new Date(b.fields.timestamp)-new Date(a.fields.timestamp));
+
+let html=`<h3>${cardId}</h3>`;
+
+list.forEach(x=>{
+
+let date=new Date(x.fields.timestamp).toLocaleString("de-DE");
+
+let color="#2196F3";
+let label="Kauf";
+
+if(x.fields.type==="topup"){color="#4CAF50";label="Aufladung";}
+if(x.fields.type==="refund"){color="#f44336";label="Auszahlung";}
+
+html+=`
+<div class="tx" style="border-left-color:${color}">
+<b>${label}</b><br>
+${x.fields.product||""}<br>
+<small>${date}</small><br>
+<b>${x.fields.amount} €</b>
+</div>`;
+});
+
+details.innerHTML=html;
 }
 
 function toggleAdmin(){
-document.getElementById("admin").classList.remove("hidden");
-document.getElementById("dashboardBox").classList.remove("hidden");
-document.getElementById("cardsBox").classList.remove("hidden");
+admin.classList.remove("hidden");
+dashboardBox.classList.remove("hidden");
+cardsBox.classList.remove("hidden");
 }
 
-function refund(){ alert("Rückgabe"); }
+async function topup(){
+
+let card=document.getElementById("card").value;
+let amount=parseFloat(document.getElementById("amount").value);
+
+let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===card);
+
+if(!c){
+await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{fields:{Title:card,balance:amount}});
+}else{
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+amount});
+}
+
+loadCards();
+}
 
 init();
 
