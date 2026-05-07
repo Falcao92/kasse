@@ -5,6 +5,7 @@
 <title>Vereinskasse</title>
 
 <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body {
@@ -12,61 +13,53 @@ body {
     background: #f4f4f4;
     padding: 20px;
 }
-
-h1 {
-    text-align: center;
-}
+h1 { text-align: center; }
 
 .section {
     background: white;
     padding: 15px;
-    margin: 10px 0;
-    border-radius: 10px;
+    margin: 15px 0;
+    border-radius: 12px;
 }
 
 button {
-    font-size: 20px;
+    font-size: 18px;
     padding: 15px;
     margin: 5px;
+    border-radius: 10px;
     border: none;
-    border-radius: 8px;
-    background: #0078d4;
     color: white;
 }
 
-button:hover {
-    background: #005ea2;
-}
+.drink { background: #0078d4; }
+.food { background: #d83b01; }
+.other { background: #107c10; }
 
-#products button {
-    width: 120px;
-    height: 80px;
-}
-
-input {
-    font-size: 18px;
+input, select {
     padding: 10px;
-    margin: 5px 0;
+    font-size: 16px;
 }
 
-.hidden {
-    display: none;
-}
+.hidden { display: none; }
 </style>
-
 </head>
+
 <body>
 
-<h1>Kasse</h1>
+<h1>Vereinskasse</h1>
 
 <div class="section">
-    <h2>Produkte</h2>
-    <div id="products"></div>
+    <input id="card" placeholder="Karte scannen">
 </div>
 
 <div class="section">
-    <h2>Karte</h2>
-    <input id="card" placeholder="Karte scannen">
+    <h2>Produkte</h2>
+    <h3>🍺 Getränke</h3>
+    <div id="drinks"></div>
+    <h3>🍔 Essen</h3>
+    <div id="food"></div>
+    <h3>📦 Sonstiges</h3>
+    <div id="other"></div>
 </div>
 
 <div class="section">
@@ -76,7 +69,7 @@ input {
 </div>
 
 <div class="section">
-    <button onclick="toggleAdmin()">Admin öffnen</button>
+    <button onclick="toggleAdmin()">Admin</button>
 </div>
 
 <div id="adminPanel" class="section hidden">
@@ -84,24 +77,41 @@ input {
 
     <input id="name" placeholder="Produkt">
     <input id="price" placeholder="Preis">
-    <button onclick="addProduct()">Produkt speichern</button>
+
+    <select id="category">
+        <option value="drink">Getränk</option>
+        <option value="food">Essen</option>
+        <option value="other">Sonstiges</option>
+    </select>
+
+    <button onclick="addProduct()">Speichern</button>
+    <button onclick="refundCard()">Karte zurückgeben</button>
+</div>
+
+<div class="section">
+    <h2>📊 Dashboard</h2>
+    Einnahmen heute: <b id="todayRevenue">0 €</b><br>
+    Gesamt: <b id="totalRevenue">0 €</b>
+
+    <canvas id="salesChart"></canvas>
+    <canvas id="categoryChart"></canvas>
+</div>
+
+<div class="section">
+    <h2>💳 Karten</h2>
+    <div id="cardList"></div>
 </div>
 
 <script>
 
-// 🔐 ADMIN PASSWORT (hier ändern!)
 const ADMIN_PASSWORD = "verein123";
 
 function toggleAdmin() {
-    const pw = prompt("Admin Passwort:");
-    if (pw === ADMIN_PASSWORD) {
+    if (prompt("Passwort:") === ADMIN_PASSWORD) {
         document.getElementById("adminPanel").classList.remove("hidden");
-    } else {
-        alert("Falsches Passwort");
-    }
+    } else alert("Falsch");
 }
 
-// ✅ MSAL CONFIG
 const msalConfig = {
     auth: {
         clientId: "844062e7-0d5c-4852-88fc-5e9940f4ed66",
@@ -112,128 +122,219 @@ const msalConfig = {
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 
-let siteId;
-let productsList;
-let cardsList;
+let siteId, productsList, cardsList, transactionsList;
+let salesChart, categoryChart;
 
-// 🔐 Token holen
 async function getToken() {
-    const request = {
-        scopes: ["User.Read", "Sites.ReadWrite.All"]
-    };
+    const request = { scopes: ["User.Read", "Sites.ReadWrite.All"] };
 
-    let accounts = msalInstance.getAllAccounts();
-
-    if (accounts.length === 0) {
-        let login = await msalInstance.loginPopup(request);
-        return login.accessToken;
+    let acc = msalInstance.getAllAccounts();
+    if (acc.length === 0) {
+        let res = await msalInstance.loginPopup(request);
+        return res.accessToken;
     }
 
-    let token = await msalInstance.acquireTokenSilent({
+    return (await msalInstance.acquireTokenSilent({
         ...request,
-        account: accounts[0]
-    });
-
-    return token.accessToken;
+        account: acc[0]
+    })).accessToken;
 }
 
-// 🌐 Graph Helper
 async function graph(url, method="GET", body=null) {
     const token = await getToken();
-
-    return fetch("https://graph.microsoft.com/v1.0" + url, {
+    let res = await fetch("https://graph.microsoft.com/v1.0" + url, {
         method,
-        headers: {
-            Authorization: "Bearer " + token,
-            "Content-Type": "application/json"
-        },
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : null
-    }).then(r => r.json());
+    });
+    return res.json();
 }
 
-// 🚀 INIT
 async function init() {
     let token = await getToken();
 
-    let siteRes = await fetch(
+    let site = await (await fetch(
         "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
-        {
-            headers: { Authorization: "Bearer " + token }
-        }
-    );
+        { headers: { Authorization: "Bearer " + token } }
+    )).json();
 
-    let site = await siteRes.json();
     siteId = site.id;
 
     let lists = await graph(`/sites/${siteId}/lists`);
 
-    productsList = lists.value.find(l => l.displayName === "products")?.id;
-    cardsList = lists.value.find(l => l.displayName === "cards")?.id;
+    productsList = lists.value.find(l => l.displayName === "products").id;
+    cardsList = lists.value.find(l => l.displayName === "cards").id;
+    transactionsList = lists.value.find(l => l.displayName === "transactions").id;
 
     loadProducts();
+    loadDashboard();
+    loadCards();
 }
 
-// 📦 Produkte laden
 async function loadProducts() {
     let res = await graph(`/sites/${siteId}/lists/${productsList}/items?expand=fields`);
 
-    let div = document.getElementById("products");
-    div.innerHTML = "";
+    ["drinks", "food", "other"].forEach(id => document.getElementById(id).innerHTML = "");
 
-    res.value.forEach(p => {
+    let sorted = res.value.sort((a,b)=>a.fields.Title.localeCompare(b.fields.Title));
+
+    sorted.forEach(p => {
         let btn = document.createElement("button");
         btn.innerText = p.fields.Title + "\n" + p.fields.price + "€";
-        btn.onclick = () => charge(p.fields.price);
-        div.appendChild(btn);
+        btn.className = p.fields.category || "other";
+        btn.onclick = () => charge(p);
+
+        document.getElementById(
+            p.fields.category === "drink" ? "drinks" :
+            p.fields.category === "food" ? "food" : "other"
+        ).appendChild(btn);
     });
 }
 
-// 💳 Abbuchen
-async function charge(amount) {
+async function charge(product) {
     let card = document.getElementById("card").value;
 
     let res = await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
-    let entry = res.value.find(x => x.fields.Title === card);
+    let c = res.value.find(x => x.fields.Title === card);
 
-    if (!entry) return alert("Karte unbekannt");
+    if (!c) return alert("Unbekannt");
 
-    if (entry.fields.balance < amount) return alert("Zu wenig Guthaben");
+    if (c.fields.balance < product.fields.price) return alert("Zu wenig");
 
-    await graph(`/sites/${siteId}/lists/${cardsList}/items/${entry.id}/fields`, "PATCH", {
-        balance: entry.fields.balance - amount
+    await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`, "PATCH", {
+        balance: c.fields.balance - product.fields.price
     });
 
-    alert("Rest: " + (entry.fields.balance - amount));
+    await graph(`/sites/${siteId}/lists/${transactionsList}/items`, "POST", {
+        fields: {
+            card_id: card,
+            amount: product.fields.price,
+            type: "charge",
+            product: product.fields.Title,
+            category: product.fields.category,
+            timestamp: new Date().toISOString()
+        }
+    });
+
+    alert("Rest: " + (c.fields.balance - product.fields.price));
+    loadDashboard();
+    loadCards();
 }
 
-// 💰 Aufladen
 async function topup() {
     let card = document.getElementById("card").value;
     let amount = parseFloat(document.getElementById("amount").value);
 
     let res = await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
-    let entry = res.value.find(x => x.fields.Title === card);
+    let c = res.value.find(x => x.fields.Title === card);
 
-    if (!entry) {
+    if (!c) {
         await graph(`/sites/${siteId}/lists/${cardsList}/items`, "POST", {
             fields: { Title: card, balance: amount }
         });
     } else {
-        await graph(`/sites/${siteId}/lists/${cardsList}/items/${entry.id}/fields`, "PATCH", {
-            balance: entry.fields.balance + amount
+        await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`, "PATCH", {
+            balance: c.fields.balance + amount
         });
     }
 
-    alert("Aufgeladen");
+    await graph(`/sites/${siteId}/lists/${transactionsList}/items`, "POST", {
+        fields: {
+            card_id: card,
+            amount: amount,
+            type: "topup",
+            timestamp: new Date().toISOString()
+        }
+    });
+
+    loadDashboard();
 }
 
-// ➕ Produkt
-async function addProduct() {
-    let name = document.getElementById("name").value;
-    let price = parseFloat(document.getElementById("price").value);
+async function refundCard() {
+    let card = document.getElementById("card").value;
 
+    let res = await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+    let c = res.value.find(x => x.fields.Title === card);
+
+    if (!c) return;
+
+    let bal = c.fields.balance;
+
+    if (!confirm("Auszahlen: " + bal)) return;
+
+    await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`, "PATCH", {
+        balance: 0
+    });
+
+    await graph(`/sites/${siteId}/lists/${transactionsList}/items`, "POST", {
+        fields: {
+            card_id: card,
+            amount: bal,
+            type: "refund",
+            timestamp: new Date().toISOString()
+        }
+    });
+
+    loadDashboard();
+    loadCards();
+}
+
+async function loadDashboard() {
+    let res = await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
+
+    let today = new Date().toISOString().slice(0,10);
+
+    let total = 0, todayTotal = 0, products = {}, cats = {};
+
+    res.value.forEach(t => {
+        let d = t.fields.timestamp?.slice(0,10);
+        if (t.fields.type === "charge") {
+            total += t.fields.amount;
+
+            if (d === today) {
+                todayTotal += t.fields.amount;
+                products[t.fields.product] = (products[t.fields.product] || 0)+1;
+                cats[t.fields.category] = (cats[t.fields.category] || 0)+t.fields.amount;
+            }
+        }
+    });
+
+    document.getElementById("todayRevenue").innerText = todayTotal.toFixed(2)+" €";
+    document.getElementById("totalRevenue").innerText = total.toFixed(2)+" €";
+
+    if (salesChart) salesChart.destroy();
+    if (categoryChart) categoryChart.destroy();
+
+    salesChart = new Chart(document.getElementById("salesChart"), {
+        type: "bar",
+        data: { labels: Object.keys(products), datasets:[{data:Object.values(products)}] }
+    });
+
+    categoryChart = new Chart(document.getElementById("categoryChart"), {
+        type: "pie",
+        data: { labels:Object.keys(cats), datasets:[{data:Object.values(cats)}] }
+    });
+}
+
+async function loadCards() {
+    let res = await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+
+    let div = document.getElementById("cardList");
+
+    res.value.sort((a,b)=>b.fields.balance-a.fields.balance);
+
+    div.innerHTML = res.value.map(c =>
+        `${c.fields.Title} → ${c.fields.balance} €`
+    ).join("<br>");
+}
+
+async function addProduct() {
     await graph(`/sites/${siteId}/lists/${productsList}/items`, "POST", {
-        fields: { Title: name, price: price }
+        fields: {
+            Title: name.value,
+            price: parseFloat(price.value),
+            category: category.value
+        }
     });
 
     loadProducts();
@@ -242,6 +343,5 @@ async function addProduct() {
 init();
 
 </script>
-
 </body>
 </html>
