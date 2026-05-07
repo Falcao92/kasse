@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>Vereinskasse FINAL</title>
 
-<!-- ✅ FIX: richtig eingebunden -->
 <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -19,14 +18,14 @@ button {
     border:none;
     color:white;
     font-weight:bold;
-    background:#66bb6a;
+    background:#7edc8a;
 }
 
-button:hover { background:#4caf50; }
+button:hover { background:#5ccf74; }
 
-.drink { background:#66bb6a; }
-.food { background:#81c784; }
-.other { background:#a5d6a7; }
+.drink { background:#7edc8a; }
+.food { background:#99e0a3; }
+.other { background:#bdf0c3; }
 
 .hidden { display:none; }
 </style>
@@ -94,74 +93,58 @@ Einnahmen: <b id="todayRevenue">0 €</b>
 
 <script>
 
-const ADMIN_PASSWORD = "verein123";
+const ADMIN_PASSWORD="verein123";
 let adminMode=false;
 
 function toggleAdmin(){
     if(prompt("Passwort:")==ADMIN_PASSWORD){
-        adminMode=true;
         document.getElementById("adminPanel").classList.remove("hidden");
         document.getElementById("dashboardSection").classList.remove("hidden");
         document.getElementById("cardsSection").classList.remove("hidden");
     }
 }
 
-// ✅ FIX: MSAL sauber initialisiert
-const msalInstance = new msal.PublicClientApplication({
-    auth:{
-        clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
-        authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
-        redirectUri: window.location.href
-    }
+const msalInstance=new msal.PublicClientApplication({
+auth:{
+clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
+authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
+redirectUri:window.location.href
+}
 });
 
-// globale Variablen
-let siteId, productsList, cardsList, transactionsList;
+let siteId,productsList,cardsList,transactionsList;
 let chart;
 
-// ✅ TOKEN
 async function getToken(){
-    const req={scopes:["Sites.ReadWrite.All"]};
-    const acc=msalInstance.getAllAccounts();
+const acc=msalInstance.getAllAccounts();
+const req={scopes:["Sites.ReadWrite.All"]};
 
-    if(acc.length===0){
-        let login=await msalInstance.loginPopup(req);
-        return login.accessToken;
-    }
-
-    let token=await msalInstance.acquireTokenSilent({
-        ...req,
-        account:acc[0]
-    });
-
-    return token.accessToken;
+if(acc.length===0){
+let login=await msalInstance.loginPopup(req);
+return login.accessToken;
 }
 
-// GRAPH
+let token=await msalInstance.acquireTokenSilent({...req,account:acc[0]});
+return token.accessToken;
+}
+
 async function graph(url,method="GET",body=null){
-    const token=await getToken();
+const token=await getToken();
 
-    let res=await fetch("https://graph.microsoft.com/v1.0"+url,{
-        method,
-        headers:{
-            Authorization:"Bearer "+token,
-            "Content-Type":"application/json"
-        },
-        body:body?JSON.stringify(body):null
-    });
-
-    return res.json();
+return(await fetch("https://graph.microsoft.com/v1.0"+url,{
+method,
+headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+body:body?JSON.stringify(body):null
+})).json();
 }
 
-// INIT
 async function init(){
 
 document.getElementById("dashboardDate").value=new Date().toISOString().slice(0,10);
 
-// ✅ WICHTIG: warten bis msal bereit ist
 const token=await getToken();
 
-let site=await (await fetch(
+let site=await(await fetch(
 "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
 {headers:{Authorization:"Bearer "+token}}
 )).json();
@@ -179,29 +162,27 @@ loadDashboard();
 loadCards();
 }
 
-// ✅ PRODUKTE
 async function loadProducts(){
 
 let res=await graph(`/sites/${siteId}/lists/${productsList}/items?expand=fields`);
 
 ["drinks","food","other"].forEach(x=>document.getElementById(x).innerHTML="");
 
-res.value.sort((a,b)=>a.fields.Title.localeCompare(b.fields.Title)).forEach(p=>{
-
+res.value.forEach(p=>{
 let btn=document.createElement("button");
-btn.innerText=p.fields.Title+"\n"+p.fields.price+"€";
-btn.className=p.fields.category||"other";
+
+btn.innerText=p.fields.Title+"\n"+p.fields.Price+"€";
+btn.className=p.fields.Category||"other";
 btn.onclick=()=>charge(p);
 
 document.getElementById(
-p.fields.category==="drink"?"drinks":
-p.fields.category==="food"?"food":"other"
+p.fields.Category==="drink"?"drinks":
+p.fields.Category==="food"?"food":"other"
 ).appendChild(btn);
-
 });
 }
 
-// ✅ ADD PRODUCT
+// ✅ FIXED
 async function addProduct(){
 
 let name=document.getElementById("name").value;
@@ -209,32 +190,46 @@ let price=parseFloat(document.getElementById("price").value);
 let category=document.getElementById("category").value;
 
 await graph(`/sites/${siteId}/lists/${productsList}/items`,"POST",{
-fields:{Title:name,price:price,category:category}
+fields:{Title:name,Price:price,Category:category}
 });
 
 alert("Gespeichert ✅");
 loadProducts();
 }
 
-// ✅ AUFLADEN
-async function topup(){
+// ✅ FIXED
+async function showCardDetails(){
 
+let card=document.getElementById("cardInput").value;
+
+let res=await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
+
+let list=res.value.filter(x=>x.fields.card_id===card);
+
+let html="";
+
+list.forEach(x=>{
+html+=`${x.fields.timestamp} | ${x.fields.type} | ${x.fields.amount}€<br>`;
+});
+
+document.getElementById("cardDetails").innerHTML=html;
+}
+
+async function loadCards(){
+
+let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+
+document.getElementById("cardList").innerHTML=res.value.map(c=>`${c.fields.Title} → ${c.fields.balance} €`).join("<br>");
+}
+
+async function topup(){
 let card=document.getElementById("cardInput").value;
 let amount=parseFloat(document.getElementById("amountInput").value);
 
-let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
-let c=res.value.find(x=>x.fields.Title===card);
-
-if(!c){
-    await graph(`/sites/${siteId}/lists/${cardsList}/items`,"POST",{fields:{Title:card,balance:amount}});
-}else{
-    await graph(`/sites/${siteId}/lists/${cardsList}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+amount});
-}
-
+await graph(`/sites/${siteId}/lists/${cardsList}/items`,"POST",{fields:{Title:card,balance:amount}});
 loadCards();
 }
 
-// ✅ DASHBOARD
 async function loadDashboard(){
 
 let date=document.getElementById("dashboardDate").value;
@@ -249,28 +244,16 @@ total+=t.fields.amount;
 }
 });
 
-document.getElementById("todayRevenue").innerText=total.toFixed(2)+" €";
+document.getElementById("todayRevenue").innerText=total+" €";
 
 if(chart) chart.destroy();
 
 chart=new Chart(document.getElementById("salesChart"),{
 type:"bar",
-data:{
-labels:["Umsatz"],
-datasets:[{data:[total],backgroundColor:"#66bb6a"}]
-}
+data:{labels:["Umsatz"],datasets:[{data:[total],backgroundColor:"#7edc8a"}]}
 });
 }
 
-// ✅ KARTEN
-async function loadCards(){
-
-let res=await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
-
-cardList.innerHTML=res.value.map(c=>`${c.fields.Title} → ${c.fields.balance}€`).join("<br>");
-}
-
-// ✅ EXPORT
 async function exportCSV(){
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsList}/items?expand=fields`);
@@ -288,10 +271,8 @@ a.download="export.csv";
 a.click();
 }
 
-// START
 init();
 
 </script>
-
 </body>
 </html>
