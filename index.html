@@ -179,6 +179,113 @@ headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},
 body:body?JSON.stringify(body):null
 })).json();
 }
+    
+async function charge(p){
+
+    let cardVal = document.getElementById("card").value;
+
+    if(!cardVal){
+        alert("Bitte Karte eingeben");
+        return;
+    }
+
+    // ✅ Popup bestätigen
+    if(!confirm(`Kauf bestätigen?\n${p.fields.Title} - ${p.fields.price} €`)){
+        return;
+    }
+
+    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+    let c = res.value.find(x=>x.fields.Title===cardVal);
+
+    if(!c){
+        alert("Karte nicht gefunden");
+        return;
+    }
+
+    if(c.fields.balance < p.fields.price){
+        alert("Zu wenig Guthaben");
+        return;
+    }
+
+    // Guthaben abziehen
+    await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
+        "PATCH",
+        {balance: c.fields.balance - p.fields.price}
+    );
+
+    // Transaktion speichern
+    await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
+        fields:{
+            card_id:cardVal,
+            amount:p.fields.price,
+            type:"charge",
+            product:p.fields.Title,
+            category:p.fields.category,
+            timestamp:new Date().toISOString()
+        }
+    });
+
+    showToast("✅ " + p.fields.Title);
+
+    loadDashboard();
+    loadCards();
+}
+
+ async function loadCards(){
+
+    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+
+    document.getElementById("cards").innerHTML = res.value.map(c => `
+        <div class="cardItem" onclick="showDetails('${c.fields.Title}')">
+            ${c.fields.Title} → ${c.fields.balance} €
+        </div>
+    `).join("");
+}
+
+ async function showDetails(cardId){
+
+    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+    let list = res.value
+        .filter(x => x.fields.card_id === cardId)
+        .sort((a,b)=> new Date(b.fields.timestamp) - new Date(a.fields.timestamp));
+
+    let html = `<h3>${cardId}</h3>`;
+
+    if(list.length === 0){
+        html += "Keine Buchungen";
+    } else {
+
+        list.forEach(x => {
+
+            let date = new Date(x.fields.timestamp).toLocaleString("de-DE");
+
+            let label = "Kauf";
+            let color = "#2196F3";
+
+            if(x.fields.type==="topup"){
+                label="Aufladung"; color="#4CAF50";
+            }
+
+            if(x.fields.type==="refund"){
+                label="Auszahlung"; color="#f44336";
+            }
+
+            html += `
+            <div class="tx" style="border-left-color:${color}">
+                <b>${label}</b><br>
+                ${x.fields.product || ""}<br>
+                <small>${date}</small><br>
+                <b>${x.fields.amount} €</b>
+            </div>
+            `;
+        });
+    }
+
+    document.getElementById("details").innerHTML = html;
+}
+   
+    
 
 async function init(){
 
