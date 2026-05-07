@@ -135,7 +135,25 @@ Bis: <input type="date" id="toDate">
 <button onclick="exportCSV()">CSV Export</button>   
 
 <script>
+let currentUser = null;
 
+async function loginM365(){
+
+    let result = await msalInstance.loginPopup({
+        scopes:["Sites.ReadWrite.All", "User.Read"]
+    });
+
+    currentUser = result.account;
+
+    // ✅ OPTIONAL: nur bestimmte Nutzer erlauben
+    if(!currentUser.username.endsWith("@deinverein.de")){
+        alert("Kein Zugriff!");
+        document.body.innerHTML = "❌ Zugriff verweigert";
+        return;
+    }
+
+    console.log("Eingeloggt als:", currentUser.username);
+}
 const ADMIN_PASSWORD="1234";
 let adminMode=false;
 let chart;
@@ -316,21 +334,21 @@ async function topup(){
 
     
 async function token(){
-let acc=msalInstance.getAllAccounts();
-if(acc.length===0){
-return (await msalInstance.loginPopup({scopes:["Sites.ReadWrite.All"]})).accessToken;
-}
-return (await msalInstance.acquireTokenSilent({scopes:["Sites.ReadWrite.All"],account:acc[0]})).accessToken;
+
+    let accounts = msalInstance.getAllAccounts();
+
+    if(accounts.length === 0){
+        await loginM365();
+    }
+
+    let response = await msalInstance.acquireTokenSilent({
+        scopes:["Sites.ReadWrite.All"],
+        account:accounts[0]
+    });
+
+    return response.accessToken;
 }
 
-async function graph(url,method="GET",body=null){
-let t=await token();
-return (await fetch("https://graph.microsoft.com/v1.0"+url,{
-method,
-headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},
-body:body?JSON.stringify(body):null
-})).json();
-}
     
 async function charge(p){
 
@@ -440,7 +458,7 @@ async function charge(p){
     
 
 async function init(){
-
+await loginM365();  // ✅ NEU
 date.value=new Date().toISOString().slice(0,10);
 fromDate.value=date.value;
 toDate.value=date.value;
