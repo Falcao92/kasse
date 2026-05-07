@@ -20,10 +20,8 @@ button {
     color:white;
     font-weight:bold;
 }
-
 button:hover { background:#5ccf74; }
 
-h3 { margin-top:10px; }
 .hidden { display:none; }
 </style>
 </head>
@@ -39,13 +37,13 @@ h3 { margin-top:10px; }
 <div class="section">
 <h2>Produkte</h2>
 
-<h3>Getränke</h3>
+<h3>🍺 Getränke</h3>
 <div id="drink"></div>
 
-<h3>Essen</h3>
+<h3>🍔 Essen</h3>
 <div id="food"></div>
 
-<h3>Sonstiges</h3>
+<h3>📦 Sonstiges</h3>
 <div id="other"></div>
 
 </div>
@@ -82,7 +80,10 @@ h3 { margin-top:10px; }
 
 <input type="date" id="date" onchange="loadDashboard()">
 
-<p>Einnahmen: <span id="sum">0 €</span></p>
+<p>💰 Gesamt: <span id="sum">0 €</span></p>
+<p>🍺 Getränke: <span id="drinkSum">0</span></p>
+<p>🍔 Essen: <span id="foodSum">0</span></p>
+<p>📦 Sonstiges: <span id="otherSum">0</span></p>
 
 <canvas id="chart"></canvas>
 </div>
@@ -97,7 +98,6 @@ h3 { margin-top:10px; }
 
 <script>
 
-// ✅ MSAL
 const msalInstance = new msal.PublicClientApplication({
     auth:{
         clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
@@ -109,7 +109,6 @@ const msalInstance = new msal.PublicClientApplication({
 let siteId, productsId, cardsId, transactionsId;
 let chart;
 
-// ✅ TOKEN
 async function token(){
     let acc = msalInstance.getAllAccounts();
 
@@ -126,7 +125,6 @@ async function token(){
     return t.accessToken;
 }
 
-// ✅ GRAPH
 async function graph(url,method="GET",body=null){
     let t = await token();
 
@@ -140,7 +138,6 @@ async function graph(url,method="GET",body=null){
     })).json();
 }
 
-// ✅ INIT
 async function init(){
 
 document.getElementById("date").value = new Date().toISOString().slice(0,10);
@@ -165,53 +162,41 @@ loadCards();
 loadDashboard();
 }
 
-// ✅ PRODUKTE (inkl. Kategorien)
+// ✅ PRODUKTE
 async function loadProducts(){
 
 let res = await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
 
-["drink","food","other"].forEach(x => document.getElementById(x).innerHTML="");
+["drink","food","other"].forEach(id => document.getElementById(id).innerHTML="");
 
 res.value.forEach(p => {
 
-    let btn = document.createElement("button");
+let btn = document.createElement("button");
 
-    btn.innerText = p.fields.Title + " " + (p.fields.price||0) + "€";
-    btn.onclick = () => charge(p);
+btn.innerText = p.fields.Title + " " + (p.fields.price||0) + "€";
+btn.onclick = () => charge(p);
 
-    let cat = p.fields.category;
+let cat = p.fields.category;
 
-    if(cat === "Getraenk"){
-        document.getElementById("drink").appendChild(btn);
-    } 
-    else if(cat === "Essen"){
-        document.getElementById("food").appendChild(btn);
-    } 
-    else {
-        document.getElementById("other").appendChild(btn);
-    }
+if(cat==="Getraenk") document.getElementById("drink").appendChild(btn);
+else if(cat==="Essen") document.getElementById("food").appendChild(btn);
+else document.getElementById("other").appendChild(btn);
+
 });
 }
 
-// ✅ PRODUKT SPEICHERN (FIXED)
+// ✅ PRODUKT SPEICHERN
 async function addProduct(){
 
 let name=document.getElementById("name").value;
 let price=parseFloat(document.getElementById("price").value);
 let category=document.getElementById("category").value;
 
-if(!name) return alert("Name fehlt");
-if(!price) return alert("Preis fehlt");
-
 await graph(`/sites/${siteId}/lists/${productsId}/items`,"POST",{
-fields:{
-Title:name,
-price:price,
-category:category
-}
+fields:{Title:name, price:price, category:category}
 });
 
-alert("Produkt gespeichert ✅");
+alert("Gespeichert ✅");
 loadProducts();
 }
 
@@ -234,6 +219,7 @@ fields:{
 card_id:card,
 amount:p.fields.price,
 type:"charge",
+category:p.fields.category,   // ✅ wichtig
 timestamp:new Date().toISOString()
 }
 });
@@ -242,46 +228,44 @@ loadDashboard();
 loadCards();
 }
 
-// ✅ AUFLADEN
-async function topup(){
-
-let card=document.getElementById("card").value;
-let amount=parseFloat(document.getElementById("amount").value);
-
-let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-let c=res.value.find(x=>x.fields.Title===card);
-
-if(!c){
-    await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{fields:{Title:card,balance:amount}});
-} else {
-    await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+amount});
-}
-
-loadCards();
-}
-
-// ✅ DASHBOARD
+// ✅ DASHBOARD (MIT KATEGORIEN)
 async function loadDashboard(){
 
 let d=document.getElementById("date").value;
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-let sum=0;
+let sum=0, drink=0, food=0, other=0;
 
 res.value.forEach(x=>{
-if(x.fields.timestamp?.slice(0,10)===d){
+if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
+
 sum+=x.fields.amount;
+
+if(x.fields.category==="Getraenk") drink++;
+else if(x.fields.category==="Essen") food++;
+else other++;
+
 }
 });
 
 document.getElementById("sum").innerText=sum+" €";
+document.getElementById("drinkSum").innerText=drink;
+document.getElementById("foodSum").innerText=food;
+document.getElementById("otherSum").innerText=other;
 
+// Chart
 if(chart) chart.destroy();
 
 chart=new Chart(document.getElementById("chart"),{
 type:"bar",
-data:{labels:["Umsatz"],datasets:[{data:[sum],backgroundColor:"#7edc8a"}]}
+data:{
+labels:["Getränke","Essen","Sonstiges"],
+datasets:[{
+data:[drink,food,other],
+backgroundColor:["#81c784","#ffb74d","#bdbdbd"]
+}]
+}
 });
 }
 
@@ -290,7 +274,7 @@ async function loadCards(){
 
 let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
 
-cards.innerHTML=res.value.map(c=>c.fields.Title+" → "+c.fields.balance+" €").join("<br>");
+cards.innerHTML=res.value.map(c=>c.fields.Title+" → "+c.fields.balance+"€").join("<br>");
 }
 
 // ✅ DETAILS
@@ -302,19 +286,17 @@ let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=field
 
 details.innerHTML=res.value
 .filter(x=>x.fields.card_id===card)
-.map(x=>x.fields.timestamp+" "+x.fields.amount+" €")
+.map(x=>x.fields.timestamp+" "+x.fields.amount+"€")
 .join("<br>");
 }
 
-// ✅ ADMIN TOGGLE
 function toggleAdmin(){
 document.getElementById("admin").classList.remove("hidden");
 document.getElementById("dashboardBox").classList.remove("hidden");
 document.getElementById("cardsBox").classList.remove("hidden");
 }
 
-// Dummy Funktionen
-function refund(){ alert("Rückgabe funktioniert"); }
+function refund(){ alert("Rückgabe"); }
 
 init();
 
