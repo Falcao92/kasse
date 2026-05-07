@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Vereinskasse</title>
+
+<!-- ✅ MSAL -->
+<script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+
+</head>
+<body>
+
+<h1>Kasse</h1>
+
+<h2>Produkte</h2>
+<div id="products"></div>
+
+<h2>Karte scannen</h2>
+<input id="card" placeholder="Karte">
+
+<h2>Aufladen</h2>
+<input id="amount" placeholder="Betrag">
+<button onclick="topup()">Aufladen</button>
+
+<h2>Admin</h2>
+<input id="name" placeholder="Produkt">
+<input id="price" placeholder="Preis">
+<button onclick="addProduct()">Speichern</button>
+
+<script>
+
+// ✅ DEINE AZURE DATEN
+const msalConfig = {
+    auth: {
+        clientId: "844062e7-0d5c-4852-88fc-5e9940f4ed66",
+        authority: "https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
+        redirectUri: window.location.href
+    }
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+let siteId;
+let productsList;
+let cardsList;
+
+// ✅ TOKEN HOLEN (ROBUST)
+async function getToken() {
+    const request = {
+        scopes: ["User.Read", "Sites.ReadWrite.All"]
+    };
+
+    let accounts = msalInstance.getAllAccounts();
+
+    if (accounts.length === 0) {
+        console.log("→ Login Popup startet");
+        const login = await msalInstance.loginPopup(request);
+        return login.accessToken;
+    }
+
+    try {
+        const token = await msalInstance.acquireTokenSilent({
+            ...request,
+            account: accounts[0]
+        });
+        return token.accessToken;
+    } catch (e) {
+        console.log("→ Silent fehlgeschlagen, Popup");
+        const token = await msalInstance.acquireTokenPopup(request);
+        return token.accessToken;
+    }
+}
+
+// ✅ GRAPH HELPER
+async function graph(url, method="GET", body=null) {
+    const token = await getToken();
+
+    let res = await fetch("https://graph.microsoft.com/v1.0" + url, {
+        method,
+        headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": "application/json"
+        },
+        body: body ? JSON.stringify(body) : null
+    });
+
+    return res.json();
+}
+
+// ✅ INIT
+async function init() {
+    console.log("INIT START");
+
+    const token = await getToken();
+
+    console.log("TOKEN OK");
+
+    let siteRes = await fetch(
+        "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
+        {
+            headers: {
+                Authorization: "Bearer " + token
+            }
+        }
+    );
+
+    let site = await siteRes.json();
+    console.log("SITE:", site);
+
+    siteId = site.id;
+
+    let lists = await graph(`/sites/${siteId}/lists`);
+    console.log("LISTS:", lists);
+
+    productsList = lists.value.find(l => l.name === "products")?.id;
+    cardsList = lists.value.find(l => l.name === "cards")?.id;
+
+    console.log("ProductsList:", productsList);
+    console.log("CardsList:", cardsList);
+
+    loadProducts();
+}
+
+// ✅ PRODUKTE LADEN
+async function loadProducts() {
+    let res = await graph(`/sites/${siteId}/lists/${productsList}/items?expand=fields`);
+
+    let div = document.getElementById("products");
+    div.innerHTML = "";
+
+    res.value.forEach(p => {
+        let btn = document.createElement("button");
+        btn.innerText = p.fields.Title + " - " + p.fields.price + "€";
+        btn.onclick = () => charge(p.fields.price);
+        div.appendChild(btn);
+    });
+}
+
+// ✅ ABBUCHEN
+async function charge(amount) {
+    let card = document.getElementById("card").value;
+
+    let res = await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+    let entry = res.value.find(x => x.fields.Title === card);
+
+    if (!entry) return alert("Karte unbekannt");
+
+    let balance = entry.fields.balance;
+
+    if (balance < amount) return alert("Zu wenig Guthaben");
+
+    await graph(`/sites/${siteId}/lists/${cardsList}/items/${entry.id}/fields`, "PATCH", {
+        balance: balance - amount
+    });
+
+    alert("Rest: " + (balance - amount));
+}
+
+// ✅ AUFLADEN
+async function topup() {
+    let card = document.getElementById("card").value;
+    let amount = parseFloat(document.getElementById("amount").value);
+
+    let res = await graph(`/sites/${siteId}/lists/${cardsList}/items?expand=fields`);
+    let entry = res.value.find(x => x.fields.Title === card);
+
+    if (!entry) {
+        await graph(`/sites/${siteId}/lists/${cardsList}/items`, "POST", {
+            fields: { Title: card, balance: amount }
+        });
+    } else {
+        await graph(`/sites/${siteId}/lists/${cardsList}/items/${entry.id}/fields`, "PATCH", {
+            balance: entry.fields.balance + amount
+        });
+    }
+
+    alert("Aufgeladen");
+}
+
+// ✅ PRODUKT HINZUFÜGEN
+async function addProduct() {
+    let name = document.getElementById("name").value;
+    let price = parseFloat(document.getElementById("price").value);
+
+    await graph(`/sites/${siteId}/lists/${productsList}/items`, "POST", {
+        fields: { Title: name, price: price }
+    });
+
+    loadProducts();
+}
+
+// ✅ START
+init();
+
+</script>
+
+</body>
+</html>
