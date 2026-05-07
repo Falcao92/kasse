@@ -4,32 +4,104 @@
 <meta charset="UTF-8">
 <title>Vereinskasse</title>
 
-<!-- ✅ MSAL -->
 <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+
+<style>
+body {
+    font-family: Arial;
+    background: #f4f4f4;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+.section {
+    background: white;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 10px;
+}
+
+button {
+    font-size: 20px;
+    padding: 15px;
+    margin: 5px;
+    border: none;
+    border-radius: 8px;
+    background: #0078d4;
+    color: white;
+}
+
+button:hover {
+    background: #005ea2;
+}
+
+#products button {
+    width: 120px;
+    height: 80px;
+}
+
+input {
+    font-size: 18px;
+    padding: 10px;
+    margin: 5px 0;
+}
+
+.hidden {
+    display: none;
+}
+</style>
 
 </head>
 <body>
 
 <h1>Kasse</h1>
 
-<h2>Produkte</h2>
-<div id="products"></div>
+<div class="section">
+    <h2>Produkte</h2>
+    <div id="products"></div>
+</div>
 
-<h2>Karte scannen</h2>
-<input id="card" placeholder="Karte">
+<div class="section">
+    <h2>Karte</h2>
+    <input id="card" placeholder="Karte scannen">
+</div>
 
-<h2>Aufladen</h2>
-<input id="amount" placeholder="Betrag">
-<button onclick="topup()">Aufladen</button>
+<div class="section">
+    <h2>Aufladen</h2>
+    <input id="amount" placeholder="Betrag">
+    <button onclick="topup()">Aufladen</button>
+</div>
 
-<h2>Admin</h2>
-<input id="name" placeholder="Produkt">
-<input id="price" placeholder="Preis">
-<button onclick="addProduct()">Speichern</button>
+<div class="section">
+    <button onclick="toggleAdmin()">Admin öffnen</button>
+</div>
+
+<div id="adminPanel" class="section hidden">
+    <h2>Admin</h2>
+
+    <input id="name" placeholder="Produkt">
+    <input id="price" placeholder="Preis">
+    <button onclick="addProduct()">Produkt speichern</button>
+</div>
 
 <script>
 
-// ✅ DEINE AZURE DATEN
+// 🔐 ADMIN PASSWORT (hier ändern!)
+const ADMIN_PASSWORD = "verein123";
+
+function toggleAdmin() {
+    const pw = prompt("Admin Passwort:");
+    if (pw === ADMIN_PASSWORD) {
+        document.getElementById("adminPanel").classList.remove("hidden");
+    } else {
+        alert("Falsches Passwort");
+    }
+}
+
+// ✅ MSAL CONFIG
 const msalConfig = {
     auth: {
         clientId: "844062e7-0d5c-4852-88fc-5e9940f4ed66",
@@ -44,7 +116,7 @@ let siteId;
 let productsList;
 let cardsList;
 
-// ✅ TOKEN HOLEN (ROBUST)
+// 🔐 Token holen
 async function getToken() {
     const request = {
         scopes: ["User.Read", "Sites.ReadWrite.All"]
@@ -53,76 +125,55 @@ async function getToken() {
     let accounts = msalInstance.getAllAccounts();
 
     if (accounts.length === 0) {
-        console.log("→ Login Popup startet");
-        const login = await msalInstance.loginPopup(request);
+        let login = await msalInstance.loginPopup(request);
         return login.accessToken;
     }
 
-    try {
-        const token = await msalInstance.acquireTokenSilent({
-            ...request,
-            account: accounts[0]
-        });
-        return token.accessToken;
-    } catch (e) {
-        console.log("→ Silent fehlgeschlagen, Popup");
-        const token = await msalInstance.acquireTokenPopup(request);
-        return token.accessToken;
-    }
+    let token = await msalInstance.acquireTokenSilent({
+        ...request,
+        account: accounts[0]
+    });
+
+    return token.accessToken;
 }
 
-// ✅ GRAPH HELPER
+// 🌐 Graph Helper
 async function graph(url, method="GET", body=null) {
     const token = await getToken();
 
-    let res = await fetch("https://graph.microsoft.com/v1.0" + url, {
+    return fetch("https://graph.microsoft.com/v1.0" + url, {
         method,
         headers: {
             Authorization: "Bearer " + token,
             "Content-Type": "application/json"
         },
         body: body ? JSON.stringify(body) : null
-    });
-
-    return res.json();
+    }).then(r => r.json());
 }
 
-// ✅ INIT
+// 🚀 INIT
 async function init() {
-    console.log("INIT START");
-
-    const token = await getToken();
-
-    console.log("TOKEN OK");
+    let token = await getToken();
 
     let siteRes = await fetch(
         "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
         {
-            headers: {
-                Authorization: "Bearer " + token
-            }
+            headers: { Authorization: "Bearer " + token }
         }
     );
 
     let site = await siteRes.json();
-    console.log("SITE:", site);
-
     siteId = site.id;
 
     let lists = await graph(`/sites/${siteId}/lists`);
-    console.log("LISTS:", lists);
 
-   productsList = lists.value.find(l => l.displayName === "products")?.id;
-cardsList = lists.value.find(l => l.displayName === "cards")?.id;
-
-
-    console.log("ProductsList:", productsList);
-    console.log("CardsList:", cardsList);
+    productsList = lists.value.find(l => l.displayName === "products")?.id;
+    cardsList = lists.value.find(l => l.displayName === "cards")?.id;
 
     loadProducts();
 }
 
-// ✅ PRODUKTE LADEN
+// 📦 Produkte laden
 async function loadProducts() {
     let res = await graph(`/sites/${siteId}/lists/${productsList}/items?expand=fields`);
 
@@ -131,13 +182,13 @@ async function loadProducts() {
 
     res.value.forEach(p => {
         let btn = document.createElement("button");
-        btn.innerText = p.fields.Title + " - " + p.fields.price + "€";
+        btn.innerText = p.fields.Title + "\n" + p.fields.price + "€";
         btn.onclick = () => charge(p.fields.price);
         div.appendChild(btn);
     });
 }
 
-// ✅ ABBUCHEN
+// 💳 Abbuchen
 async function charge(amount) {
     let card = document.getElementById("card").value;
 
@@ -146,18 +197,16 @@ async function charge(amount) {
 
     if (!entry) return alert("Karte unbekannt");
 
-    let balance = entry.fields.balance;
-
-    if (balance < amount) return alert("Zu wenig Guthaben");
+    if (entry.fields.balance < amount) return alert("Zu wenig Guthaben");
 
     await graph(`/sites/${siteId}/lists/${cardsList}/items/${entry.id}/fields`, "PATCH", {
-        balance: balance - amount
+        balance: entry.fields.balance - amount
     });
 
-    alert("Rest: " + (balance - amount));
+    alert("Rest: " + (entry.fields.balance - amount));
 }
 
-// ✅ AUFLADEN
+// 💰 Aufladen
 async function topup() {
     let card = document.getElementById("card").value;
     let amount = parseFloat(document.getElementById("amount").value);
@@ -178,7 +227,7 @@ async function topup() {
     alert("Aufgeladen");
 }
 
-// ✅ PRODUKT HINZUFÜGEN
+// ➕ Produkt
 async function addProduct() {
     let name = document.getElementById("name").value;
     let price = parseFloat(document.getElementById("price").value);
@@ -190,7 +239,6 @@ async function addProduct() {
     loadProducts();
 }
 
-// ✅ START
 init();
 
 </script>
