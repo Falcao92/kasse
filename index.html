@@ -159,11 +159,48 @@ loadProducts();
 }
 }
 
-const msalInstance=new msal.PublicClientApplication({
-auth:{
-clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
-authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
-redirectUri:window.location.href
+// ✅ MSAL INIT
+const msalInstance = new msal.PublicClientApplication({
+    auth: {
+        clientId: "844062e7-0d5c-4852-88fc-5e9940f4ed66",
+        authority: "https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
+        redirectUri: window.location.href
+    }
+});
+
+// ✅ LOGIN (REDIRECT – KEIN POPUP!)
+async function loginM365(){
+
+    const accounts = msalInstance.getAllAccounts();
+
+    // Kein Login → redirect starten
+    if(accounts.length === 0){
+        await msalInstance.loginRedirect({
+            scopes:["Sites.ReadWrite.All","User.Read"]
+        });
+        return; // Seite lädt neu
+    }
+
+    // Bereits eingeloggt
+    console.log("✅ Eingeloggt:", accounts[0].username);
+}
+
+
+// ✅ TOKEN HOLEN
+async function token(){
+
+    const accounts = msalInstance.getAllAccounts();
+
+    if(accounts.length === 0){
+        await loginM365();
+    }
+
+    const response = await msalInstance.acquireTokenSilent({
+        scopes:["Sites.ReadWrite.All"],
+        account: accounts[0]
+    });
+
+    return response.accessToken;
 }
 });
 
@@ -440,6 +477,10 @@ async function charge(p){
     
 
 async function init(){
+
+
+    await msalInstance.handleRedirectPromise(); // ✅ ganz oben
+    await loginM365();                          // ✅ direkt danach
 
 date.value=new Date().toISOString().slice(0,10);
 fromDate.value=date.value;
