@@ -150,12 +150,14 @@ let currentUser = null;
     }
 
     // wenn eingeloggt
-    currentUser = accounts[0];
+currentUser = accounts[0];
 
-    console.log("Eingeloggt:", currentUser.username);
+console.log("Eingeloggt:", currentUser.username);
 
-    document.getElementById("userInfo")?.innerText =
-        "👤 " + currentUser.username;
+let el = document.getElementById("userInfo");
+
+if(el){
+    el.innerText = "👤 " + currentUser.username;
 }
 
 
