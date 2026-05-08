@@ -56,6 +56,9 @@ display:none;
 <input id="card" placeholder="Karte scannen">
 </div>
     <button onclick="scanNFC()">📡 NFC scannen</button>
+    <input id="card" placeholder="Karte scannen">
+<button onclick="clearCard()">❌</button>
+
 
 <div class="section">
 <h2>Produkte</h2>
@@ -136,6 +139,9 @@ Bis: <input type="date" id="toDate">
 <button onclick="exportCSV()">CSV Export</button>   
 
 <script>
+    function clearCard(){
+    document.getElementById("card").value = "";
+}
 
 const ADMIN_PASSWORD="1234";
 let adminMode=false;
