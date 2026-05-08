@@ -181,8 +181,16 @@ headers:{Authorization:"Bearer "+await token()}
 loadProducts();
 };
 
-btn.appendChild(edit);
-btn.appendChild(del);
+
+let container = document.createElement("div");
+
+container.appendChild(btn);
+
+if(adminMode){
+    container.appendChild(edit);
+    container.appendChild(del);
+}
+
 }
 
 let cat=p.fields.category || "Sonstiges";
@@ -306,36 +314,7 @@ details.innerHTML=res.value
 .join("<br>");
 }
 
-// ✅ AUSWERTUNG
-let container=document.createElement("div");
 
-let btn=document.createElement("button");
-btn.innerText=p.fields.Title+" "+p.fields.price+"€";
-btn.onclick=()=>charge(p);
-
-container.appendChild(btn);
-
-if(adminMode){
-
-let edit=document.createElement("button");
-edit.innerText="✏️";
-edit.onclick=async()=>{
-let np=prompt("Neuer Preis",p.fields.price);
-await graph(`/sites/${siteId}/lists/${productsId}/items/${p.id}/fields`,
-"PATCH",{price:parseFloat(np)});
-loadProducts();
-};
-
-let del=document.createElement("button");
-del.innerText="🗑";
-del.onclick=async()=>{
-if(!confirm("Löschen?"))return;
-await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${productsId}/items/${p.id}`,{
-method:"DELETE",
-headers:{Authorization:"Bearer "+await token()}
-});
-loadProducts();
-};
 
 container.appendChild(edit);
 container.appendChild(del);
@@ -344,6 +323,25 @@ container.appendChild(del);
 (cat==="Getraenk"?drink:cat==="Essen"?food:other).appendChild(container);
 
 
+    async function loadProductStats(){
+
+    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+    let stats = {};
+
+    res.value.forEach(x=>{
+        if(x.fields.type==="charge"){
+            let p = x.fields.product || "Unbekannt";
+            stats[p] = (stats[p]||0)+1;
+        }
+    });
+
+    productStats.innerHTML = Object.entries(stats)
+        .map(x => x[0] + " → " + x[1] + "x")
+        .join("<br>");
+}
+
+    
 
 init();
 
