@@ -12,36 +12,24 @@ body { font-family: Arial; background:#f4f4f4; padding:20px;}
 .section { background:white; padding:15px; margin:15px 0; border-radius:12px;}
 
 button {
-    padding:12px;
-    margin:5px;
-    border-radius:8px;
+    padding:10px;
+    margin:3px;
+    border-radius:6px;
     border:none;
     background:#7edc8a;
     color:white;
-    font-weight:bold;
-    cursor:pointer;
 }
+
 .hidden { display:none; }
 
 .cardItem {
     display:flex;
     justify-content:space-between;
-    padding:10px;
-    margin:5px;
-    background:#fafafa;
-    border-radius:8px;
-    cursor:pointer;
-}
-
-.toast {
-    position:fixed;
-    bottom:20px;
-    right:20px;
-    background:#333;
-    color:white;
-    padding:10px;
+    padding:8px;
+    margin:5px 0;
+    background:#f2f2f2;
     border-radius:6px;
-    display:none;
+    cursor:pointer;
 }
 </style>
 </head>
@@ -50,61 +38,73 @@ button {
 
 <h1>Vereinskasse</h1>
 
-<input id="card" placeholder="Karte scannen">
+<input id="card" placeholder="Karte">
 
 <div class="section">
-<h2>Produkte</h2>
-<div id="drink"></div>
-<div id="food"></div>
-<div id="other"></div>
+<h3>Produkte</h3>
+
+<h4>🍺 Getränke</h4><div id="drink"></div>
+<h4>🍔 Essen</h4><div id="food"></div>
+<h4>📦 Sonstiges</h4><div id="other"></div>
+
 </div>
 
 <div class="section">
-<input id="amount" placeholder="Betrag">
+<input id="amount">
 <button onclick="topup()">Aufladen</button>
-<button onclick="refundCard()">Auszahlung</button>
+<button onclick="refundCard()">Auszahlen</button>
 </div>
 
 <button onclick="loginAdmin()">Admin</button>
 
 <div id="admin" class="hidden section">
 <h3>Admin</h3>
+
 <input id="name" placeholder="Produkt">
 <input id="price" placeholder="Preis">
+<select id="category">
+<option value="Getraenk">Getränk</option>
+<option value="Essen">Essen</option>
+<option value="Sonstiges">Sonstiges</option>
+</select>
+
 <button onclick="addProduct()">Speichern</button>
 
-<h3>Auswertung</h3>
-<input type="date" id="fromDate">
-<input type="date" id="toDate">
-<button onclick="loadProductStats()">Auswerten</button>
-<div id="productStats"></div>
-<canvas id="statsChart"></canvas>
-
 <hr>
-<button onclick="exportCSV()">CSV Export</button>
+
+<h3>Auswertung</h3>
+Von <input type="date" id="fromDate">
+Bis <input type="date" id="toDate">
+<button onclick="loadProductStats()">Start</button>
+<div id="productStats"></div>
 </div>
 
 <div id="dashboardSection" class="hidden section">
 <h3>Dashboard</h3>
-<input type="date" id="date">
+
+<input type="date" id="date" onchange="loadDashboard()">
+
 <p>Gesamt: <span id="sum">0</span></p>
 <p>Getränke: <span id="drinkSum">0</span></p>
 <p>Essen: <span id="foodSum">0</span></p>
 <p>Sonstiges: <span id="otherSum">0</span></p>
+
 <canvas id="chart"></canvas>
+
 </div>
 
 <div id="cardsSection" class="hidden section">
 <h3>Karten</h3>
 <div id="cards"></div>
+
+<h4>Details</h4>
 <div id="details"></div>
 </div>
 
-<div id="toast" class="toast"></div>
-
 <script>
 
-const msalInstance = new msal.PublicClientApplication({
+// 🔐 MS LOGIN
+const msalInstance=new msal.PublicClientApplication({
 auth:{
 clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
 authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
@@ -112,24 +112,20 @@ redirectUri:window.location.href
 }
 });
 
-let currentUser=null;
 let siteId, productsId, cardsId, transactionsId;
-let chart, statsChart;
-let adminMode=false;
-const ADMIN_PASSWORD="1234";
+let chart;
 
-async function loginM365(){
-let acc = msalInstance.getAllAccounts();
+async function login(){
+let acc=msalInstance.getAllAccounts();
 if(acc.length===0){
 await msalInstance.loginRedirect({scopes:["Sites.ReadWrite.All"]});
 return;
 }
-currentUser=acc[0];
 }
 
 async function token(){
-let acc = msalInstance.getAllAccounts();
-let t = await msalInstance.acquireTokenSilent({
+let acc=msalInstance.getAllAccounts();
+let t=await msalInstance.acquireTokenSilent({
 scopes:["Sites.ReadWrite.All"],
 account:acc[0]
 });
@@ -149,24 +145,39 @@ body:body?JSON.stringify(body):null
 return res.json();
 }
 
-function showToast(t){
-let el=document.getElementById("toast");
-el.innerText=t;
-el.style.display="block";
-setTimeout(()=>el.style.display="none",2000);
+// ✅ INIT
+async function init(){
+
+await msalInstance.handleRedirectPromise();
+await login();
+
+date.value=new Date().toISOString().slice(0,10);
+fromDate.value=date.value;
+toDate.value=date.value;
+
+let t=await token();
+
+let site=await (await fetch(
+"https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
+{headers:{Authorization:"Bearer "+t}}
+)).json();
+
+siteId=site.id;
+
+let lists=await graph(`/sites/${siteId}/lists`);
+
+productsId=lists.value.find(l=>l.displayName==="products").id;
+cardsId=lists.value.find(l=>l.displayName==="cards").id;
+transactionsId=lists.value.find(l=>l.displayName==="transactions").id;
+
+loadProducts();
+loadDashboard();
+loadCards();
 }
 
-function loginAdmin(){
-let pw=prompt("Passwort");
-if(pw===ADMIN_PASSWORD){
-adminMode=true;
-admin.classList.remove("hidden");
-dashboardSection.classList.remove("hidden");
-cardsSection.classList.remove("hidden");
-}
-}
-
+// ✅ PRODUKTE
 async function loadProducts(){
+
 let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
 
 drink.innerHTML="";
@@ -174,41 +185,67 @@ food.innerHTML="";
 other.innerHTML="";
 
 res.value.forEach(p=>{
-let b=document.createElement("button");
-b.innerText=p.fields.Title+" "+p.fields.price+"€";
-b.onclick=()=>charge(p);
 
-if(p.fields.category==="Getraenk") drink.appendChild(b);
-else if(p.fields.category==="Essen") food.appendChild(b);
-else other.appendChild(b);
+let btn=document.createElement("button");
+btn.innerText=(p.fields.Title||"???")+" "+(p.fields.price||0)+"€";
+
+btn.onclick=()=>charge(p);
+
+let cat=p.fields.category||"Sonstiges";
+
+if(cat==="Getraenk") drink.appendChild(btn);
+else if(cat==="Essen") food.appendChild(btn);
+else other.appendChild(btn);
+
 });
 }
 
+// ✅ ADD PRODUCT
+async function addProduct(){
+
+await graph(`/sites/${siteId}/lists/${productsId}/items`,"POST",{
+fields:{
+Title:name.value,
+price:parseFloat(price.value),
+category:category.value
+}
+});
+
+loadProducts();
+}
+
+// ✅ KAUF
 async function charge(p){
-if(!confirm("Kauf?"))return;
 
-let list=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-let c=list.value.find(x=>x.fields.Title===card.value);
-if(!c)return alert("Keine Karte");
+let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===card.value);
 
-await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance-p.fields.price});
+if(!c)return alert("Karte fehlt");
 
-await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{fields:{
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{
+balance:c.fields.balance-(p.fields.price||0)
+});
+
+await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
+fields:{
 card_id:card.value,
-amount:p.fields.price,
+amount:p.fields.price||0,
 type:"charge",
-product:p.fields.Title,
-category:p.fields.category,
+product:p.fields.Title||"Unbekannt",
+category:p.fields.category||"Sonstiges",
 timestamp:new Date().toISOString()
-}});
+}
+});
 
 loadDashboard();
 loadCards();
 }
 
+// ✅ AUFLADEN
 async function topup(){
-let list=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-let c=list.value.find(x=>x.fields.Title===card.value);
+
+let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===card.value);
 
 if(!c){
 await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{fields:{Title:card.value,balance:parseFloat(amount.value)}});
@@ -216,46 +253,59 @@ await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{fields:{Title:card
 await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+parseFloat(amount.value)});
 }
 
-showToast("Aufgeladen");
 loadCards();
 }
 
+// ✅ AUSZAHLUNG
 async function refundCard(){
-let list=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-let c=list.value.find(x=>x.fields.Title===card.value);
+
+let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===card.value);
+
+if(!c)return;
 
 await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:0});
 
-await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{fields:{
+await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
+fields:{
 card_id:card.value,
 amount:c.fields.balance,
 type:"refund",
+product:"Auszahlung",
 timestamp:new Date().toISOString()
-}});
+}
+});
 
-showToast("Ausgezahlt");
 loadCards();
+loadDashboard();
 }
 
+// ✅ KARTEN
 async function loadCards(){
+
 let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
 
 cards.innerHTML=res.value.map(c=>`
 <div class="cardItem" onclick="showDetails('${c.fields.Title}')">
-${c.fields.Title} → ${c.fields.balance}
+${c.fields.Title} → ${c.fields.balance||0}
 </div>`).join("");
 }
 
+// ✅ DETAILS FIX
 async function showDetails(id){
+
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
 details.innerHTML=res.value
 .filter(x=>x.fields.card_id===id)
-.map(x=>x.fields.product+" "+x.fields.amount)
-.join("<br>");
+.map(x=>`
+${(x.fields.product||x.fields.type)} → ${(x.fields.amount||0)}€
+`).join("<br>");
 }
 
+// ✅ DASHBOARD FIX
 async function loadDashboard(){
+
 let d=date.value;
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
@@ -263,8 +313,8 @@ let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=field
 let sumVal=0,dr=0,fo=0,ot=0;
 
 res.value.forEach(x=>{
-if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
-sumVal+=x.fields.amount;
+if(x.fields.type==="charge"){
+sumVal+=x.fields.amount||0;
 
 if(x.fields.category==="Getraenk")dr++;
 else if(x.fields.category==="Essen")fo++;
@@ -281,49 +331,34 @@ if(chart) chart.destroy();
 
 chart=new Chart(document.getElementById("chart"),{
 type:"bar",
-data:{labels:["Getränke","Essen","Sonstiges"],datasets:[{data:[dr,fo,ot]}]}
+data:{
+labels:["Getränke","Essen","Sonstiges"],
+datasets:[{data:[dr,fo,ot]}]
+}
 });
 }
 
-async function exportCSV(){
+// ✅ AUSWERTUNG FIX
+async function loadProductStats(){
+
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-let rows=["card,product,amount"];
+let stats={};
 
 res.value.forEach(x=>{
-rows.push(`${x.fields.card_id},${x.fields.product},${x.fields.amount}`);
+if(x.fields.type==="charge"){
+let p=x.fields.product||"Unbekannt";
+stats[p]=(stats[p]||0)+1;
+}
 });
 
-let blob=new Blob([rows.join("\n")]);
-let a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="export.csv";
-a.click();
-}
-
-async function init(){
-await msalInstance.handleRedirectPromise();
-await loginM365();
-
-date.value=new Date().toISOString().slice(0,10);
-
-let t=await token();
-
-let site=await (await fetch("https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",{headers:{Authorization:"Bearer "+t}})).json();
-
-siteId=site.id;
-
-let lists=await graph(`/sites/${siteId}/lists`);
-productsId=lists.value.find(l=>l.displayName==="products").id;
-cardsId=lists.value.find(l=>l.displayName==="cards").id;
-transactionsId=lists.value.find(l=>l.displayName==="transactions").id;
-
-loadProducts();
-loadDashboard();
-loadCards();
+productStats.innerHTML=Object.entries(stats)
+.map(x=>x[0]+" → "+x[1]+"x")
+.join("<br>");
 }
 
 init();
+
 </script>
 
 </body>
