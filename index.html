@@ -622,16 +622,22 @@ else ot++;
 }
 });
 
-sum.innerText=sum+" €";
+document.getElementById("sum").innerText = sum + " €";
 drinkSum.innerText=dr;
 foodSum.innerText=fo;
 otherSum.innerText=ot;
 
 if(chart) chart.destroy();
 
-chart=new Chart(document.getElementById("chart"),{
-type:"bar",
-data:{labels:["Getränke","Essen","Sonstiges"],datasets:[{data:[dr,fo,ot]}]}
+chart = new Chart(document.getElementById("chart"), {
+    type: "bar",
+    data: {
+        labels: ["Getränke","Essen","Sonstiges"],
+        datasets: [{
+            label: "Anzahl Verkäufe",   // ✅ wichtig!
+            data: [dr, fo, ot]
+        }]
+    }
 });
 }
 
