@@ -264,26 +264,33 @@ async function scanNFC(){
 
         showToast("📡 Scanner aktiv – Karte dranhalten");
 
-        ndef.onreading = (event) => {
+    ndef.onreading = (event) => {
 
-            try {
+    try {
 
-                let decoder = new TextDecoder();
+        let record = event.message.records[0];
 
-                let record = event.message.records[0];
+        let cardId = "Unbekannt";
 
-                let cardId = decoder.decode(record.data);
+        // ✅ TEXT (Standardfall)
+        if(record.recordType === "text"){
+            const decoder = new TextDecoder(record.encoding);
+            cardId = decoder.decode(record.data);
+        }
+        else {
+            // ✅ fallback: rohe Daten anzeigen
+            const decoder = new TextDecoder();
+            cardId = decoder.decode(record.data);
+        }
 
-                // 👉 Karte ins Feld schreiben
-                document.getElementById("card").value = cardId;
+        document.getElementById("card").value = cardId;
 
-                showToast("✅ Karte erkannt: " + cardId);
+        showToast("✅ Karte: " + cardId);
 
-            } catch (err) {
-                alert("Fehler beim Lesen der Karte");
-            }
-
-        };
+    } catch (err) {
+        alert("❌ Karte konnte nicht gelesen werden");
+    }
+};
 
     } catch (error) {
         alert("❌ NFC Zugriff fehlgeschlagen: " + error);
