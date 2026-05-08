@@ -268,27 +268,24 @@ async function scanNFC(){
 
     try {
 
-        let record = event.message.records[0];
+        let cardId = event.serialNumber || "Unbekannt";
 
-        let cardId = "Unbekannt";
+        if(event.message.records.length > 0){
 
-        // ✅ TEXT (Standardfall)
-        if(record.recordType === "text"){
-            const decoder = new TextDecoder(record.encoding);
-            cardId = decoder.decode(record.data);
-        }
-        else {
-            // ✅ fallback: rohe Daten anzeigen
-            const decoder = new TextDecoder();
-            cardId = decoder.decode(record.data);
+            let record = event.message.records[0];
+
+            if(record.recordType === "text"){
+                const decoder = new TextDecoder(record.encoding);
+                cardId = decoder.decode(record.data);
+            }
         }
 
         document.getElementById("card").value = cardId;
 
-        showToast("✅ Karte: " + cardId);
+        showToast("✅ Karte erkannt: " + cardId);
 
     } catch (err) {
-        alert("❌ Karte konnte nicht gelesen werden");
+        alert("❌ Fehler beim Lesen");
     }
 };
 
