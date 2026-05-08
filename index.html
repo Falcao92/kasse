@@ -55,6 +55,7 @@ display:none;
 <div class="section">
 <input id="card" placeholder="Karte scannen">
 </div>
+    <button onclick="scanNFC()">📡 NFC scannen</button>
 
 <div class="section">
 <h2>Produkte</h2>
@@ -247,7 +248,47 @@ let siteId, productsId, cardsId, transactionsId;
     showToast("📥 Export erstellt");
 }
   
+async function scanNFC(){
 
+    // Prüfen ob NFC unterstützt wird
+    if (!("NDEFReader" in window)) {
+        alert("❌ NFC wird auf diesem Gerät nicht unterstützt");
+        return;
+    }
+
+    try {
+
+        const ndef = new NDEFReader();
+
+        await ndef.scan();
+
+        showToast("📡 Scanner aktiv – Karte dranhalten");
+
+        ndef.onreading = (event) => {
+
+            try {
+
+                let decoder = new TextDecoder();
+
+                let record = event.message.records[0];
+
+                let cardId = decoder.decode(record.data);
+
+                // 👉 Karte ins Feld schreiben
+                document.getElementById("card").value = cardId;
+
+                showToast("✅ Karte erkannt: " + cardId);
+
+            } catch (err) {
+                alert("Fehler beim Lesen der Karte");
+            }
+
+        };
+
+    } catch (error) {
+        alert("❌ NFC Zugriff fehlgeschlagen: " + error);
+    }
+}
 
     
 async function topup(){
