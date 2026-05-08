@@ -196,14 +196,31 @@ else other.appendChild(btn);
 
 // ✅ ADD PRODUCT
 async function addProduct(){
-await graph(`/sites/${siteId}/lists/${productsId}/items`,"POST",{
-fields:{
-Title:name.value,
-price:parseFloat(price.value),
-category:category.value
-}});
-loadProducts();
+
+    let n = document.getElementById("name").value;
+    let p = parseFloat(document.getElementById("price").value);
+    let c = document.getElementById("category").value;
+
+    if(!n || isNaN(p)){
+        alert("Bitte Name + Preis eingeben");
+        return;
+    }
+
+    await graph(`/sites/${siteId}/lists/${productsId}/items`, "POST", {
+        fields:{
+            Title: n,
+            price: p,
+            category: c
+        }
+    });
+
+    // Felder leeren (wichtig für UX)
+    name.value="";
+    price.value="";
+
+    loadProducts();
 }
+
 
 // ✅ KAUF
 async function charge(p){
@@ -231,31 +248,40 @@ loadDashboard();
 // ✅ DASHBOARD
 async function loadDashboard(){
 
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+    let d = document.getElementById("date").value;
 
-let sum=0,dr=0,fo=0,ot=0;
+    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-res.value.forEach(x=>{
-if(x.fields.type==="charge"){
-sum+=x.fields.amount;
+    let sumVal=0,dr=0,fo=0,ot=0;
 
-if(x.fields.category==="Getraenk")dr++;
-else if(x.fields.category==="Essen")fo++;
-else ot++;
-}
-});
+    res.value.forEach(x=>{
 
-document.getElementById("sum").innerText=sum;
-drinkSum.innerText=dr;
-foodSum.innerText=fo;
-otherSum.innerText=ot;
+        let ts = x.fields.timestamp?.slice(0,10);
 
-if(chart)chart.destroy();
+        if(ts === d && x.fields.type==="charge"){
 
-chart=new Chart(document.getElementById("chart"),{
-type:"bar",
-data:{labels:["Getränke","Essen","Sonstiges"],datasets:[{data:[dr,fo,ot]}]}
-});
+            sumVal += x.fields.amount || 0;
+
+            if(x.fields.category==="Getraenk") dr++;
+            else if(x.fields.category==="Essen") fo++;
+            else ot++;
+        }
+    });
+
+    document.getElementById("sum").innerText = sumVal + " €";
+    drinkSum.innerText = dr;
+    foodSum.innerText = fo;
+    otherSum.innerText = ot;
+
+    if(chart) chart.destroy();
+
+    chart=new Chart(document.getElementById("chart"),{
+        type:"bar",
+        data:{
+            labels:["Getränke","Essen","Sonstiges"],
+            datasets:[{data:[dr,fo,ot]}]
+        }
+    });
 }
 
 // ✅ CARDS
@@ -281,21 +307,42 @@ details.innerHTML=res.value
 }
 
 // ✅ AUSWERTUNG
-async function loadProductStats(){
+let container=document.createElement("div");
 
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+let btn=document.createElement("button");
+btn.innerText=p.fields.Title+" "+p.fields.price+"€";
+btn.onclick=()=>charge(p);
 
-let stats={};
+container.appendChild(btn);
 
-res.value.forEach(x=>{
-if(x.fields.type==="charge"){
-let p=x.fields.product||"Unbekannt";
-stats[p]=(stats[p]||0)+1;
-}});
+if(adminMode){
 
-productStats.innerHTML=Object.entries(stats)
-.map(x=>x[0]+" → "+x[1]+"x")
-.join("<br>");
+let edit=document.createElement("button");
+edit.innerText="✏️";
+edit.onclick=async()=>{
+let np=prompt("Neuer Preis",p.fields.price);
+await graph(`/sites/${siteId}/lists/${productsId}/items/${p.id}/fields`,
+"PATCH",{price:parseFloat(np)});
+loadProducts();
+};
+
+let del=document.createElement("button");
+del.innerText="🗑";
+del.onclick=async()=>{
+if(!confirm("Löschen?"))return;
+await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${productsId}/items/${p.id}`,{
+method:"DELETE",
+headers:{Authorization:"Bearer "+await token()}
+});
+loadProducts();
+};
+
+container.appendChild(edit);
+container.appendChild(del);
+}
+
+(cat==="Getraenk"?drink:cat==="Essen"?food:other).appendChild(container);
+
 }
 
 init();
