@@ -10,27 +10,9 @@
 <style>
 body { font-family: Arial; background:#f4f4f4; padding:20px;}
 .section { background:white; padding:15px; margin:15px 0; border-radius:12px;}
-
-button {
-    padding:10px;
-    margin:3px;
-    border-radius:6px;
-    border:none;
-    background:#7edc8a;
-    color:white;
-}
-
+button { padding:8px; margin:3px; background:#7edc8a; border:none; border-radius:6px;}
 .hidden { display:none; }
-
-.cardItem {
-    display:flex;
-    justify-content:space-between;
-    padding:8px;
-    margin:5px 0;
-    background:#f2f2f2;
-    border-radius:6px;
-    cursor:pointer;
-}
+.cardItem { padding:8px; margin:3px; background:#eee; cursor:pointer; }
 </style>
 </head>
 
@@ -58,10 +40,10 @@ button {
 <button onclick="loginAdmin()">Admin</button>
 
 <div id="admin" class="hidden section">
-<h3>Admin</h3>
 
 <input id="name" placeholder="Produkt">
 <input id="price" placeholder="Preis">
+
 <select id="category">
 <option value="Getraenk">Getränk</option>
 <option value="Essen">Essen</option>
@@ -70,109 +52,97 @@ button {
 
 <button onclick="addProduct()">Speichern</button>
 
-<hr>
-
-<h3>Auswertung</h3>
-Von <input type="date" id="fromDate">
-Bis <input type="date" id="toDate">
+<h4>Auswertung</h4>
 <button onclick="loadProductStats()">Start</button>
 <div id="productStats"></div>
+
 </div>
 
 <div id="dashboardSection" class="hidden section">
-<h3>Dashboard</h3>
-
+<h4>Dashboard</h4>
 <input type="date" id="date" onchange="loadDashboard()">
-
-<p>Gesamt: <span id="sum">0</span></p>
-<p>Getränke: <span id="drinkSum">0</span></p>
-<p>Essen: <span id="foodSum">0</span></p>
-<p>Sonstiges: <span id="otherSum">0</span></p>
-
+<p>Summe: <span id="sum"></span></p>
+<p>Getränke: <span id="drinkSum"></span></p>
+<p>Essen: <span id="foodSum"></span></p>
+<p>Sonstiges: <span id="otherSum"></span></p>
 <canvas id="chart"></canvas>
-
 </div>
 
 <div id="cardsSection" class="hidden section">
-<h3>Karten</h3>
+<h4>Karten</h4>
 <div id="cards"></div>
-
-<h4>Details</h4>
 <div id="details"></div>
 </div>
 
 <script>
 
-// 🔐 MS LOGIN
 const msalInstance=new msal.PublicClientApplication({
 auth:{
 clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
 authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
 redirectUri:window.location.href
-}
-});
+}});
 
 let siteId, productsId, cardsId, transactionsId;
+let adminMode=false;
+const ADMIN_PASSWORD="1234";
 let chart;
 
+// LOGIN
 async function login(){
 let acc=msalInstance.getAllAccounts();
 if(acc.length===0){
 await msalInstance.loginRedirect({scopes:["Sites.ReadWrite.All"]});
 return;
-}
-}
+}}
 
+// TOKEN
 async function token(){
 let acc=msalInstance.getAllAccounts();
-let t=await msalInstance.acquireTokenSilent({
-scopes:["Sites.ReadWrite.All"],
-account:acc[0]
-});
-return t.accessToken;
+let r=await msalInstance.acquireTokenSilent({scopes:["Sites.ReadWrite.All"],account:acc[0]});
+return r.accessToken;
 }
 
+// GRAPH
 async function graph(url,method="GET",body=null){
 let t=await token();
 let res=await fetch("https://graph.microsoft.com/v1.0"+url,{
 method,
-headers:{
-Authorization:"Bearer "+t,
-"Content-Type":"application/json"
-},
+headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},
 body:body?JSON.stringify(body):null
 });
 return res.json();
 }
 
-// ✅ INIT
+// ADMIN
+function loginAdmin(){
+let pw=prompt("Passwort");
+if(pw===ADMIN_PASSWORD){
+admin.classList.remove("hidden");
+dashboardSection.classList.remove("hidden");
+cardsSection.classList.remove("hidden");
+adminMode=true;
+}}
+    
+// INIT
 async function init(){
 
 await msalInstance.handleRedirectPromise();
 await login();
 
 date.value=new Date().toISOString().slice(0,10);
-fromDate.value=date.value;
-toDate.value=date.value;
 
-let t=await token();
-
-let site=await (await fetch(
-"https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
-{headers:{Authorization:"Bearer "+t}}
-)).json();
-
-siteId=site.id;
+let s=await fetch("https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",{headers:{Authorization:"Bearer "+await token()}});
+siteId=(await s.json()).id;
 
 let lists=await graph(`/sites/${siteId}/lists`);
-
 productsId=lists.value.find(l=>l.displayName==="products").id;
 cardsId=lists.value.find(l=>l.displayName==="cards").id;
 transactionsId=lists.value.find(l=>l.displayName==="transactions").id;
 
 loadProducts();
-loadDashboard();
 loadCards();
+loadDashboard();
 }
 
 // ✅ PRODUKTE
@@ -187,14 +157,38 @@ other.innerHTML="";
 res.value.forEach(p=>{
 
 let btn=document.createElement("button");
-btn.innerText=(p.fields.Title||"???")+" "+(p.fields.price||0)+"€";
-
+btn.innerText=p.fields.Title+" "+p.fields.price+"€";
 btn.onclick=()=>charge(p);
 
-let cat=p.fields.category||"Sonstiges";
+// ✅ Edit/Delete Buttons im Admin
+if(adminMode){
 
-if(cat==="Getraenk") drink.appendChild(btn);
-else if(cat==="Essen") food.appendChild(btn);
+let edit=document.createElement("button");
+edit.innerText="✏️";
+edit.onclick=async ()=>{
+let np=prompt("Neuer Preis",p.fields.price);
+await graph(`/sites/${siteId}/lists/${productsId}/items/${p.id}/fields`,"PATCH",{price:parseFloat(np)});
+loadProducts();
+};
+
+let del=document.createElement("button");
+del.innerText="🗑";
+del.onclick=async ()=>{
+await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${productsId}/items/${p.id}`,{
+method:"DELETE",
+headers:{Authorization:"Bearer "+await token()}
+});
+loadProducts();
+};
+
+btn.appendChild(edit);
+btn.appendChild(del);
+}
+
+let cat=p.fields.category || "Sonstiges";
+
+if(cat==="Getraenk")drink.appendChild(btn);
+else if(cat==="Essen")food.appendChild(btn);
 else other.appendChild(btn);
 
 });
@@ -202,15 +196,12 @@ else other.appendChild(btn);
 
 // ✅ ADD PRODUCT
 async function addProduct(){
-
 await graph(`/sites/${siteId}/lists/${productsId}/items`,"POST",{
 fields:{
 Title:name.value,
 price:parseFloat(price.value),
 category:category.value
-}
-});
-
+}});
 loadProducts();
 }
 
@@ -222,72 +213,59 @@ let c=res.value.find(x=>x.fields.Title===card.value);
 
 if(!c)return alert("Karte fehlt");
 
-await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{
-balance:c.fields.balance-(p.fields.price||0)
-});
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance-p.fields.price});
 
-await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
-fields:{
+await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{fields:{
 card_id:card.value,
-amount:p.fields.price||0,
+amount:p.fields.price,
 type:"charge",
-product:p.fields.Title||"Unbekannt",
-category:p.fields.category||"Sonstiges",
+product:p.fields.Title,
+category:p.fields.category,
 timestamp:new Date().toISOString()
-}
-});
-
-loadDashboard();
-loadCards();
-}
-
-// ✅ AUFLADEN
-async function topup(){
-
-let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-let c=res.value.find(x=>x.fields.Title===card.value);
-
-if(!c){
-await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{fields:{Title:card.value,balance:parseFloat(amount.value)}});
-}else{
-await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+parseFloat(amount.value)});
-}
-
-loadCards();
-}
-
-// ✅ AUSZAHLUNG
-async function refundCard(){
-
-let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-let c=res.value.find(x=>x.fields.Title===card.value);
-
-if(!c)return;
-
-await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:0});
-
-await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
-fields:{
-card_id:card.value,
-amount:c.fields.balance,
-type:"refund",
-product:"Auszahlung",
-timestamp:new Date().toISOString()
-}
-});
+}});
 
 loadCards();
 loadDashboard();
 }
 
-// ✅ KARTEN
+// ✅ DASHBOARD
+async function loadDashboard(){
+
+let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+let sum=0,dr=0,fo=0,ot=0;
+
+res.value.forEach(x=>{
+if(x.fields.type==="charge"){
+sum+=x.fields.amount;
+
+if(x.fields.category==="Getraenk")dr++;
+else if(x.fields.category==="Essen")fo++;
+else ot++;
+}
+});
+
+document.getElementById("sum").innerText=sum;
+drinkSum.innerText=dr;
+foodSum.innerText=fo;
+otherSum.innerText=ot;
+
+if(chart)chart.destroy();
+
+chart=new Chart(document.getElementById("chart"),{
+type:"bar",
+data:{labels:["Getränke","Essen","Sonstiges"],datasets:[{data:[dr,fo,ot]}]}
+});
+}
+
+// ✅ CARDS
 async function loadCards(){
 
 let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
 
 cards.innerHTML=res.value.map(c=>`
 <div class="cardItem" onclick="showDetails('${c.fields.Title}')">
-${c.fields.Title} → ${c.fields.balance||0}
+${c.fields.Title} → ${c.fields.balance}
 </div>`).join("");
 }
 
@@ -298,47 +276,11 @@ let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=field
 
 details.innerHTML=res.value
 .filter(x=>x.fields.card_id===id)
-.map(x=>`
-${(x.fields.product||x.fields.type)} → ${(x.fields.amount||0)}€
-`).join("<br>");
+.map(x=>`${x.fields.product||x.fields.type} → ${x.fields.amount}€`)
+.join("<br>");
 }
 
-// ✅ DASHBOARD FIX
-async function loadDashboard(){
-
-let d=date.value;
-
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-let sumVal=0,dr=0,fo=0,ot=0;
-
-res.value.forEach(x=>{
-if(x.fields.type==="charge"){
-sumVal+=x.fields.amount||0;
-
-if(x.fields.category==="Getraenk")dr++;
-else if(x.fields.category==="Essen")fo++;
-else ot++;
-}
-});
-
-document.getElementById("sum").innerText=sumVal;
-drinkSum.innerText=dr;
-foodSum.innerText=fo;
-otherSum.innerText=ot;
-
-if(chart) chart.destroy();
-
-chart=new Chart(document.getElementById("chart"),{
-type:"bar",
-data:{
-labels:["Getränke","Essen","Sonstiges"],
-datasets:[{data:[dr,fo,ot]}]
-}
-});
-}
-
-// ✅ AUSWERTUNG FIX
+// ✅ AUSWERTUNG
 async function loadProductStats(){
 
 let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
@@ -349,8 +291,7 @@ res.value.forEach(x=>{
 if(x.fields.type==="charge"){
 let p=x.fields.product||"Unbekannt";
 stats[p]=(stats[p]||0)+1;
-}
-});
+}});
 
 productStats.innerHTML=Object.entries(stats)
 .map(x=>x[0]+" → "+x[1]+"x")
