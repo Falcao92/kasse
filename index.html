@@ -21,30 +21,28 @@ button {
     font-weight:bold;
     cursor:pointer;
 }
-button:hover { background:#5ccf74; }
+.hidden { display:none; }
 
 .cardItem {
     display:flex;
     justify-content:space-between;
     padding:10px;
-    margin:6px 0;
-    border-radius:8px;
+    margin:5px;
     background:#fafafa;
+    border-radius:8px;
     cursor:pointer;
 }
 
-.toast{
-position:fixed;
-bottom:20px;
-right:20px;
-background:#333;
-color:white;
-padding:10px;
-border-radius:6px;
-display:none;
+.toast {
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    background:#333;
+    color:white;
+    padding:10px;
+    border-radius:6px;
+    display:none;
 }
-
-.hidden { display:none; }
 </style>
 </head>
 
@@ -52,140 +50,61 @@ display:none;
 
 <h1>Vereinskasse</h1>
 
-<div class="section">
 <input id="card" placeholder="Karte scannen">
-</div>
 
 <div class="section">
 <h2>Produkte</h2>
-<h3>🍺 Getränke</h3><div id="drink"></div>
-<h3>🍔 Essen</h3><div id="food"></div>
-<h3>📦 Sonstiges</h3><div id="other"></div>
+<div id="drink"></div>
+<div id="food"></div>
+<div id="other"></div>
 </div>
 
 <div class="section">
 <input id="amount" placeholder="Betrag">
 <button onclick="topup()">Aufladen</button>
+<button onclick="refundCard()">Auszahlung</button>
 </div>
 
-<div class="section">
-<button onclick="refundCard()">💶 Auszahlung</button>
-</div>
-
-<div class="section">
 <button onclick="loginAdmin()">Admin</button>
-</div>
 
-<!-- ADMIN -->
-<div id="admin" class="section hidden">
-<h2>Admin</h2>
-
+<div id="admin" class="hidden section">
+<h3>Admin</h3>
 <input id="name" placeholder="Produkt">
 <input id="price" placeholder="Preis">
-<select id="category">
-<option value="Getraenk">Getränk</option>
-<option value="Essen">Essen</option>
-<option value="Sonstiges">Sonstiges</option>
-</select>
-
 <button onclick="addProduct()">Speichern</button>
 
-<hr>
-
-<h3>📊 Erweiterte Auswertung</h3>
-
-Von: <input type="date" id="fromDate">
-Bis: <input type="date" id="toDate">
-
+<h3>Auswertung</h3>
+<input type="date" id="fromDate">
+<input type="date" id="toDate">
 <button onclick="loadProductStats()">Auswerten</button>
-
 <div id="productStats"></div>
 <canvas id="statsChart"></canvas>
 
+<hr>
+<button onclick="exportCSV()">CSV Export</button>
 </div>
 
-<!-- DASHBOARD -->
-<div id="dashboardSection" class="section hidden">
-<h2>📊 Tages Dashboard</h2>
-<input type="date" id="date" onchange="loadDashboard()">
-
-<p>💰 Gesamt: <span id="sum">0 €</span></p>
-<p>🍺 Getränke: <span id="drinkSum">0</span></p>
-<p>🍔 Essen: <span id="foodSum">0</span></p>
-<p>📦 Sonstiges: <span id="otherSum">0</span></p>
-
+<div id="dashboardSection" class="hidden section">
+<h3>Dashboard</h3>
+<input type="date" id="date">
+<p>Gesamt: <span id="sum">0</span></p>
+<p>Getränke: <span id="drinkSum">0</span></p>
+<p>Essen: <span id="foodSum">0</span></p>
+<p>Sonstiges: <span id="otherSum">0</span></p>
 <canvas id="chart"></canvas>
 </div>
 
-<!-- KARTEN -->
-<div id="cardsSection" class="section hidden">
-<h2>💳 Karten</h2>
+<div id="cardsSection" class="hidden section">
+<h3>Karten</h3>
 <div id="cards"></div>
-
-<h3>Details</h3>
 <div id="details"></div>
 </div>
 
 <div id="toast" class="toast"></div>
 
- <hr>
-
-<h3>📥 Export</h3>
-
-<button onclick="exportCSV()">CSV Export</button>   
-
 <script>
-let currentUser = null;
 
-    async function loginM365(){
-
-    // wenn kein Account → Redirect Login starten
-    let accounts = msalInstance.getAllAccounts();
-
-    if(accounts.length === 0){
-        await msalInstance.loginRedirect({
-            scopes:["Sites.ReadWrite.All","User.Read"]
-        });
-        return; // stop → Seite lädt danach neu
-    }
-
-    // wenn eingeloggt
-currentUser = accounts[0];
-
-console.log("Eingeloggt:", currentUser.username);
-
-let el = document.getElementById("userInfo");
-
-if(el){
-    el.innerText = "👤 " + currentUser.username;
-}
-        }
-
-
-const ADMIN_PASSWORD="1234";
-let adminMode=false;
-let chart;
-let statsChart;
-
-function showToast(text){
-let t=document.getElementById("toast");
-t.innerText=text;
-t.style.display="block";
-setTimeout(()=>t.style.display="none",2000);
-}
-
-function loginAdmin(){
-let pw=prompt("Passwort:");
-if(pw===ADMIN_PASSWORD){
-adminMode=true;
-admin.classList.remove("hidden");
-dashboardSection.classList.remove("hidden");
-cardsSection.classList.remove("hidden");
-loadProducts();
-}
-}
-
-const msalInstance=new msal.PublicClientApplication({
+const msalInstance = new msal.PublicClientApplication({
 auth:{
 clientId:"844062e7-0d5c-4852-88fc-5e9940f4ed66",
 authority:"https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
@@ -193,294 +112,204 @@ redirectUri:window.location.href
 }
 });
 
+let currentUser=null;
 let siteId, productsId, cardsId, transactionsId;
+let chart, statsChart;
+let adminMode=false;
+const ADMIN_PASSWORD="1234";
 
-  async function exportCSV(){
-
-    let from = document.getElementById("fromDate").value;
-    let to = document.getElementById("toDate").value;
-
-    if(!from || !to){
-        alert("Bitte Zeitraum wählen");
-        return;
-    }
-
-    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-    let rows = ["Karte,Produkt,Kategorie,Typ,Betrag,Zeit"];
-
-    res.value.forEach(x => {
-
-        let d = x.fields.timestamp?.slice(0,10);
-
-        if(d >= from && d <= to){
-
-            rows.push([
-                x.fields.card_id,
-                x.fields.product || "",
-                x.fields.category || "",
-                x.fields.type,
-                x.fields.amount,
-                x.fields.timestamp
-            ].join(","));
-        }
-    });
-
-    let blob = new Blob([rows.join("\n")], {type:"text/csv"});
-
-    let a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `export_${from}_bis_${to}.csv`;
-    a.click();
-
-    showToast("📥 Export erstellt");
+async function loginM365(){
+let acc = msalInstance.getAllAccounts();
+if(acc.length===0){
+await msalInstance.loginRedirect({scopes:["Sites.ReadWrite.All"]});
+return;
 }
-  
-
-
-    
-async function topup(){
-
-    let cardVal = document.getElementById("card").value;
-    let amountVal = parseFloat(document.getElementById("amount").value);
-
-    if(!cardVal || !amountVal){
-        alert("Karte oder Betrag fehlt");
-        return;
-    }
-
-    // Popup zur Bestätigung
-    if(!confirm(`Aufladen bestätigen?\n${amountVal} €`)){
-        return;
-    }
-
-    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-    let c = res.value.find(x=>x.fields.Title === cardVal);
-
-    if(!c){
-        // neue Karte anlegen
-        await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{
-            fields:{
-                Title:cardVal,
-                balance:amountVal
-            }
-        });
-    } else {
-        // Guthaben erhöhen
-        await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
-            "PATCH",
-            {balance: c.fields.balance + amountVal}
-        );
-    }
-
-    // Transaktion speichern
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
-        fields:{
-            card_id:cardVal,
-            amount:amountVal,
-            type:"topup",
-            product:"Aufladung",
-            timestamp:new Date().toISOString()
-        }
-    });
-
-    showToast("💰 Aufgeladen: " + amountVal + "€");
-
-    loadCards();
-}
-    async function refundCard(){
-
-    let cardVal = document.getElementById("card").value;
-
-    if(!cardVal){
-        alert("Karte fehlt");
-        return;
-    }
-
-    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-    let c = res.value.find(x=>x.fields.Title === cardVal);
-
-    if(!c){
-        alert("Karte nicht gefunden");
-        return;
-    }
-
-    let balance = c.fields.balance;
-
-    if(balance <= 0){
-        alert("Kein Guthaben vorhanden");
-        return;
-    }
-
-    // Popup bestätigen
-    if(!confirm(`Auszahlen?\n${balance} €`)){
-        return;
-    }
-
-    // Guthaben auf 0 setzen
-    await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
-        "PATCH",
-        {balance: 0}
-    );
-
-    // Transaktion speichern
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
-        fields:{
-            card_id:cardVal,
-            amount:balance,
-            type:"refund",
-            product:"Auszahlung",
-            timestamp:new Date().toISOString()
-        }
-    });
-
-    showToast("💶 Auszahlung: " + balance + "€");
-
-    loadCards();
-    loadDashboard();
+currentUser=acc[0];
 }
 
-    
 async function token(){
-
-    let accounts = msalInstance.getAllAccounts();
-
-    if(accounts.length === 0){
-        await loginM365();
-    }
-
-    let response = await msalInstance.acquireTokenSilent({
-        scopes:["Sites.ReadWrite.All"],
-        account:accounts[0]
-    });
-
-    return response.accessToken;
+let acc = msalInstance.getAllAccounts();
+let t = await msalInstance.acquireTokenSilent({
+scopes:["Sites.ReadWrite.All"],
+account:acc[0]
+});
+return t.accessToken;
 }
 
+async function graph(url,method="GET",body=null){
+let t=await token();
+let res=await fetch("https://graph.microsoft.com/v1.0"+url,{
+method,
+headers:{
+Authorization:"Bearer "+t,
+"Content-Type":"application/json"
+},
+body:body?JSON.stringify(body):null
+});
+return res.json();
+}
 
-    
+function showToast(t){
+let el=document.getElementById("toast");
+el.innerText=t;
+el.style.display="block";
+setTimeout(()=>el.style.display="none",2000);
+}
+
+function loginAdmin(){
+let pw=prompt("Passwort");
+if(pw===ADMIN_PASSWORD){
+adminMode=true;
+admin.classList.remove("hidden");
+dashboardSection.classList.remove("hidden");
+cardsSection.classList.remove("hidden");
+}
+}
+
+async function loadProducts(){
+let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
+
+drink.innerHTML="";
+food.innerHTML="";
+other.innerHTML="";
+
+res.value.forEach(p=>{
+let b=document.createElement("button");
+b.innerText=p.fields.Title+" "+p.fields.price+"€";
+b.onclick=()=>charge(p);
+
+if(p.fields.category==="Getraenk") drink.appendChild(b);
+else if(p.fields.category==="Essen") food.appendChild(b);
+else other.appendChild(b);
+});
+}
+
 async function charge(p){
+if(!confirm("Kauf?"))return;
 
-    let cardVal = document.getElementById("card").value;
+let list=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=list.value.find(x=>x.fields.Title===card.value);
+if(!c)return alert("Keine Karte");
 
-    if(!cardVal){
-        alert("Bitte Karte eingeben");
-        return;
-    }
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance-p.fields.price});
 
-    // ✅ Popup bestätigen
-    if(!confirm(`Kauf bestätigen?\n${p.fields.Title} - ${p.fields.price} €`)){
-        return;
-    }
+await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{fields:{
+card_id:card.value,
+amount:p.fields.price,
+type:"charge",
+product:p.fields.Title,
+category:p.fields.category,
+timestamp:new Date().toISOString()
+}});
 
-    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-    let c = res.value.find(x=>x.fields.Title===cardVal);
-
-    if(!c){
-        alert("Karte nicht gefunden");
-        return;
-    }
-
-    if(c.fields.balance < p.fields.price){
-        alert("Zu wenig Guthaben");
-        return;
-    }
-
-    // Guthaben abziehen
-    await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
-        "PATCH",
-        {balance: c.fields.balance - p.fields.price}
-    );
-
-    // Transaktion speichern
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
-        fields:{
-            card_id:cardVal,
-            amount:p.fields.price,
-            type:"charge",
-            product:p.fields.Title,
-            category:p.fields.category,
-            timestamp:new Date().toISOString()
-        }
-    });
-
-    showToast("✅ " + p.fields.Title);
-
-    loadDashboard();
-    loadCards();
+loadDashboard();
+loadCards();
 }
 
- async function loadCards(){
+async function topup(){
+let list=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=list.value.find(x=>x.fields.Title===card.value);
 
-    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-
-    document.getElementById("cards").innerHTML = res.value.map(c => `
-        <div class="cardItem" onclick="showDetails('${c.fields.Title}')">
-            ${c.fields.Title} → ${c.fields.balance} €
-        </div>
-    `).join("");
+if(!c){
+await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{fields:{Title:card.value,balance:parseFloat(amount.value)}});
+}else{
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:c.fields.balance+parseFloat(amount.value)});
 }
 
- async function showDetails(cardId){
-
-    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-    let list = res.value
-        .filter(x => x.fields.card_id === cardId)
-        .sort((a,b)=> new Date(b.fields.timestamp) - new Date(a.fields.timestamp));
-
-    let html = `<h3>${cardId}</h3>`;
-
-    if(list.length === 0){
-        html += "Keine Buchungen";
-    } else {
-
-        list.forEach(x => {
-
-            let date = new Date(x.fields.timestamp).toLocaleString("de-DE");
-
-            let label = "Kauf";
-            let color = "#2196F3";
-
-            if(x.fields.type==="topup"){
-                label="Aufladung"; color="#4CAF50";
-            }
-
-            if(x.fields.type==="refund"){
-                label="Auszahlung"; color="#f44336";
-            }
-
-            html += `
-            <div class="tx" style="border-left-color:${color}">
-                <b>${label}</b><br>
-                ${x.fields.product || ""}<br>
-                <small>${date}</small><br>
-                <b>${x.fields.amount} €</b>
-            </div>
-            `;
-        });
-    }
-
-    document.getElementById("details").innerHTML = html;
+showToast("Aufgeladen");
+loadCards();
 }
-   
-    
+
+async function refundCard(){
+let list=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=list.value.find(x=>x.fields.Title===card.value);
+
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,"PATCH",{balance:0});
+
+await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{fields:{
+card_id:card.value,
+amount:c.fields.balance,
+type:"refund",
+timestamp:new Date().toISOString()
+}});
+
+showToast("Ausgezahlt");
+loadCards();
+}
+
+async function loadCards(){
+let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+
+cards.innerHTML=res.value.map(c=>`
+<div class="cardItem" onclick="showDetails('${c.fields.Title}')">
+${c.fields.Title} → ${c.fields.balance}
+</div>`).join("");
+}
+
+async function showDetails(id){
+let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+details.innerHTML=res.value
+.filter(x=>x.fields.card_id===id)
+.map(x=>x.fields.product+" "+x.fields.amount)
+.join("<br>");
+}
+
+async function loadDashboard(){
+let d=date.value;
+
+let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+let sumVal=0,dr=0,fo=0,ot=0;
+
+res.value.forEach(x=>{
+if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
+sumVal+=x.fields.amount;
+
+if(x.fields.category==="Getraenk")dr++;
+else if(x.fields.category==="Essen")fo++;
+else ot++;
+}
+});
+
+document.getElementById("sum").innerText=sumVal;
+drinkSum.innerText=dr;
+foodSum.innerText=fo;
+otherSum.innerText=ot;
+
+if(chart) chart.destroy();
+
+chart=new Chart(document.getElementById("chart"),{
+type:"bar",
+data:{labels:["Getränke","Essen","Sonstiges"],datasets:[{data:[dr,fo,ot]}]}
+});
+}
+
+async function exportCSV(){
+let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+let rows=["card,product,amount"];
+
+res.value.forEach(x=>{
+rows.push(`${x.fields.card_id},${x.fields.product},${x.fields.amount}`);
+});
+
+let blob=new Blob([rows.join("\n")]);
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="export.csv";
+a.click();
+}
 
 async function init(){
-    
-    // ✅ Redirect Antwort verarbeiten
-    await msalInstance.handleRedirectPromise();
+await msalInstance.handleRedirectPromise();
+await loginM365();
 
-await loginM365();  // ✅ NEU
 date.value=new Date().toISOString().slice(0,10);
-fromDate.value=date.value;
-toDate.value=date.value;
 
 let t=await token();
-let site=await (await fetch(
-"https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
-{headers:{Authorization:"Bearer "+t}}
-)).json();
+
+let site=await (await fetch("https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",{headers:{Authorization:"Bearer "+t}})).json();
 
 siteId=site.id;
 
@@ -494,145 +323,8 @@ loadDashboard();
 loadCards();
 }
 
-// PRODUKTE + ADMIN EDIT
-async function loadProducts(){
-
-let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
-
-drink.innerHTML=""; food.innerHTML=""; other.innerHTML="";
-
-res.value.forEach(p=>{
-
-let container=document.createElement("div");
-
-let btn=document.createElement("button");
-btn.innerText=p.fields.Title+" "+p.fields.price+"€";
-btn.onclick=()=>charge(p);
-container.appendChild(btn);
-
-// ADMIN CONTROLS
-if(adminMode){
-
-let edit=document.createElement("button");
-edit.innerText="✏️";
-edit.onclick=async()=>{
-let np=prompt("Neuer Preis",p.fields.price);
-await graph(`/sites/${siteId}/lists/${productsId}/items/${p.id}/fields`,"PATCH",{price:parseFloat(np)});
-loadProducts();
-};
-
-let del=document.createElement("button");
-del.innerText="🗑";
-del.onclick=async()=>{
-if(!confirm("Löschen?"))return;
-let t=await token();
-await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${productsId}/items/${p.id}`,{
-method:"DELETE",
-headers:{Authorization:"Bearer "+t}
-});
-loadProducts();
-};
-
-container.appendChild(edit);
-container.appendChild(del);
-}
-
-let cat=p.fields.category;
-(cat==="Getraenk"?drink:cat==="Essen"?food:other).appendChild(container);
-
-});
-}
-
-// DASHBOARD FIX
-async function loadDashboard(){
-
-let d=date.value;
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-let sum=0,dr=0,fo=0,ot=0;
-
-res.value.forEach(x=>{
-if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
-sum+=x.fields.amount;
-
-if(x.fields.category==="Getraenk") dr++;
-else if(x.fields.category==="Essen") fo++;
-else ot++;
-}
-});
-
-sum.innerText=sum+" €";
-drinkSum.innerText=dr;
-foodSum.innerText=fo;
-otherSum.innerText=ot;
-
-if(chart) chart.destroy();
-
-chart=new Chart(document.getElementById("chart"),{
-type:"bar",
-data:{labels:["Getränke","Essen","Sonstiges"],datasets:[{data:[dr,fo,ot]}]}
-});
-}
-
-// ✅ ERWEITERTE AUSWERTUNG
-async function loadProductStats(){
-
-let from=fromDate.value;
-let to=toDate.value;
-
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-let products={}, categories={Getraenk:0,Essen:0,Sonstiges:0}, total=0;
-
-res.value.forEach(x=>{
-let d=x.fields.timestamp?.slice(0,10);
-
-if(d>=from && d<=to && x.fields.type==="charge"){
-
-let prod=x.fields.product;
-let amt=x.fields.amount;
-let cat=x.fields.category;
-
-if(!products[prod]) products[prod]={count:0,sum:0};
-
-products[prod].count++;
-products[prod].sum+=amt;
-
-categories[cat]+=amt;
-total+=amt;
-}
-});
-
-let sorted=Object.entries(products).sort((a,b)=>b[1].sum-a[1].sum);
-
-let html=`<h4>💰 Gesamt: ${total.toFixed(2)} €</h4><h4>Produkte:</h4>`;
-
-sorted.forEach(p=>{
-html+=`${p[0]} → ${p[1].count}x | ${p[1].sum.toFixed(2)} €<br>`;
-});
-
-html+=`<h4>Kategorien:</h4>
-🍺 ${categories.Getraenk.toFixed(2)} €<br>
-🍔 ${categories.Essen.toFixed(2)} €<br>
-📦 ${categories.Sonstiges.toFixed(2)} €`;
-
-productStats.innerHTML=html;
-
-// Chart
-if(statsChart) statsChart.destroy();
-
-statsChart=new Chart(document.getElementById("statsChart"),{
-type:"bar",
-data:{
-labels:sorted.map(p=>p[0]),
-datasets:[{data:sorted.map(p=>p[1].sum),backgroundColor:"#7edc8a"}]
-}
-});
-}
-
 init();
-    
-
 </script>
+
 </body>
 </html>
