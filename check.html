@@ -3,29 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <title>Kartensaldo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
+
 body {
   font-family: Arial;
   text-align: center;
-  padding: 40px;
+  padding: 20px;
   background: #f4f4f4;
 }
 
+/* ✅ großer Titel */
+h1 {
+  font-size: 28px;
+}
+
+/* ✅ große Erklärung */
+.info {
+  margin: 20px 0;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+/* ✅ großer Button */
 button {
-  padding: 20px;
-  font-size: 20px;
-  border-radius: 10px;
+  width: 90%;
+  max-width: 400px;
+  padding: 25px;
+  font-size: 24px;
+  border-radius: 15px;
   border: none;
   background: #4CAF50;
   color: white;
+  margin-top: 20px;
 }
 
+/* ✅ Statusanzeige */
 #result {
   margin-top: 30px;
-  font-size: 24px;
+  font-size: 22px;
   white-space: pre-line;
 }
+
+/* ✅ Hinweis Box */
+.hint {
+  margin-top: 40px;
+  background: white;
+  padding: 15px;
+  border-radius: 10px;
+  font-size: 14px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
 </style>
 </head>
 
@@ -33,9 +66,26 @@ button {
 
 <h1>💳 Guthaben prüfen</h1>
 
-<button onclick="scanNFC()">📡 NFC scannen</button>
+<div class="info">
+    📱 Halte dein Handy an die Karte<br>
+    und tippe auf "Scannen"
+</div>
 
-<div id="result">Bitte Karte scannen</div>
+<button onclick="scanNFC()">
+    📡 NFC SCANNEN
+</button>
+
+<div id="result">
+    Bitte Karte scannen
+</div>
+
+<div class="hint">
+    <b>ℹ️ Hinweis</b><br><br>
+    ✅ Funktioniert nur mit <b>Android + Google Chrome</b><br>
+    ✅ NFC muss im Handy aktiviert sein<br><br>
+    📍 NFC aktivieren:<br>
+    Einstellungen → Verbindungen → NFC
+</div>
 
 <script>
 
@@ -46,7 +96,7 @@ async function scanNFC(){
     try {
 
         if (!("NDEFReader" in window)) {
-            alert("❌ NFC nicht unterstützt");
+            alert("❌ NFC wird nicht unterstützt.\nNutze Android + Chrome");
             return;
         }
 
@@ -61,9 +111,9 @@ async function scanNFC(){
             let cardId = event.serialNumber || "unknown";
 
             document.getElementById("result").innerText =
-                "✅ Karte erkannt: " + cardId + "\nÖffne Guthaben...";
+                "✅ Karte erkannt\nÖffne Guthaben...";
 
-            // ✅ WICHTIG: direkt Seite öffnen
+            // ✅ stabile Lösung → Seite öffnen
             setTimeout(() => {
                 window.location.href = API_URL + "?id=" + encodeURIComponent(cardId);
             }, 300);
