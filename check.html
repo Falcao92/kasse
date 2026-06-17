@@ -41,6 +41,7 @@ button {
 
 const API_URL = "https://kasse-backend-vvwu.onrender.com/api/balance";
 
+// ✅ NFC starten
 async function scanNFC(){
 
     try {
@@ -56,45 +57,54 @@ async function scanNFC(){
 
         document.getElementById("result").innerText = "📡 Scanne...";
 
-        ndef.onreading = async (event) => {
+        ndef.onreading = (event) => {
 
             let cardId = event.serialNumber || "unknown";
+
+            window.lastCard = cardId;
 
             document.getElementById("result").innerText =
                 "✅ Karte erkannt: " + cardId + "\nLade Guthaben...";
 
-            // ✅ Delay Fix für Android NFC
-            setTimeout(async () => {
-
-                try {
-
-                    let res = await fetch(API_URL + "?id=" + encodeURIComponent(cardId));
-
-                    if(!res.ok){
-                        throw new Error("HTTP " + res.status);
-                    }
-
-                    let data = await res.json();
-
-                    document.getElementById("result").innerText =
-                        "💳 Karte: " + cardId +
-                        "\n\n💰 Guthaben: " + data.balance + " €";
-
-                } catch (e) {
-
-                    console.error("API ERROR:", e);
-
-                    document.getElementById("result").innerText =
-                        "❌ Fehler beim Laden (API)";
-                }
-
+            // ✅ WICHTIG: getrennt vom NFC Event
+            setTimeout(() => {
+                loadBalance();
             }, 300);
-
         };
 
     } catch (err) {
         console.error(err);
         alert("❌ NFC Fehler: " + err.message);
+    }
+}
+
+// ✅ API sauber getrennt
+async function loadBalance(){
+
+    let cardId = window.lastCard;
+
+    if(!cardId) return;
+
+    try {
+
+        let res = await fetch(API_URL + "?id=" + encodeURIComponent(cardId));
+
+        if(!res.ok){
+            throw new Error("HTTP " + res.status);
+        }
+
+        let data = await res.json();
+
+        document.getElementById("result").innerText =
+            "💳 Karte: " + cardId +
+            "\n\n💰 Guthaben: " + data.balance + " €";
+
+    } catch (e) {
+
+        console.error("API ERROR:", e);
+
+        document.getElementById("result").innerText =
+            "❌ Fehler beim Laden (API)";
     }
 }
 
