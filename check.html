@@ -57,20 +57,18 @@ async function scanNFC(){
 
         document.getElementById("result").innerText = "📡 Scanne...";
 
-        ndef.onreading = (event) => {
+       ndef.onreading = (event) => {
 
-            let cardId = event.serialNumber || "unknown";
+    let cardId = event.serialNumber || "unknown";
 
-            window.lastCard = cardId;
+    document.getElementById("result").innerText =
+        "✅ Karte erkannt: " + cardId + "\nÖffne Guthaben...";
 
-            document.getElementById("result").innerText =
-                "✅ Karte erkannt: " + cardId + "\nLade Guthaben...";
-
-            // ✅ WICHTIG: API komplett entkoppeln
-            requestAnimationFrame(() => {
-                setTimeout(loadBalance, 500);
-            });
-        };
+    // ✅ Direkt API öffnen (kein fetch!)
+    setTimeout(() => {
+        window.location.href = API_URL + "?id=" + encodeURIComponent(cardId);
+    }, 300);
+};
 
     } catch (err) {
         console.error(err);
