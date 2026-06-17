@@ -188,6 +188,150 @@ async function graph(){
 return {value:[]};
 }
 
+    // PRODUKTE + ADMIN EDIT
+async function loadProducts(){
+
+let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
+
+drink.innerHTML=""; food.innerHTML=""; other.innerHTML="";
+
+res.value.forEach(p=>{
+
+let container=document.createElement("div");
+
+let btn=document.createElement("button");
+btn.innerText=p.fields.Title+" "+p.fields.price+"€";
+btn.onclick=()=>charge(p);
+container.appendChild(btn);
+
+// ADMIN CONTROLS
+if(adminMode){
+
+let edit=document.createElement("button");
+edit.innerText="✏️";
+edit.onclick=async()=>{
+let np=prompt("Neuer Preis",p.fields.price);
+await graph(`/sites/${siteId}/lists/${productsId}/items/${p.id}/fields`,"PATCH",{price:parseFloat(np)});
+loadProducts();
+};
+
+let del=document.createElement("button");
+del.innerText="🗑";
+del.onclick=async()=>{
+if(!confirm("Löschen?"))return;
+let t=await token();
+await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${productsId}/items/${p.id}`,{
+method:"DELETE",
+headers:{Authorization:"Bearer "+t}
+});
+loadProducts();
+};
+
+container.appendChild(edit);
+container.appendChild(del);
+}
+
+let cat=p.fields.category;
+(cat==="Getraenk"?drink:cat==="Essen"?food:other).appendChild(container);
+
+});
+}
+
+// DASHBOARD FIX
+async function loadDashboard(){
+
+let d=date.value;
+let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+let sum=0,dr=0,fo=0,ot=0;
+
+res.value.forEach(x=>{
+if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
+sum+=x.fields.amount;
+
+if(x.fields.category==="Getraenk") dr++;
+else if(x.fields.category==="Essen") fo++;
+else ot++;
+}
+});
+
+document.getElementById("sum").innerText = sum + " €";
+drinkSum.innerText=dr;
+foodSum.innerText=fo;
+otherSum.innerText=ot;
+
+if(chart) chart.destroy();
+
+chart = new Chart(document.getElementById("chart"), {
+    type: "bar",
+    data: {
+        labels: ["Getränke","Essen","Sonstiges"],
+        datasets: [{
+            label: "Anzahl Verkäufe",   // ✅ wichtig!
+            data: [dr, fo, ot]
+        }]
+    }
+});
+}
+
+// ✅ ERWEITERTE AUSWERTUNG
+async function loadProductStats(){
+
+let from=fromDate.value;
+let to=toDate.value;
+
+let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+let products={}, categories={Getraenk:0,Essen:0,Sonstiges:0}, total=0;
+
+res.value.forEach(x=>{
+let d=x.fields.timestamp?.slice(0,10);
+
+if(d>=from && d<=to && x.fields.type==="charge"){
+
+let prod=x.fields.product;
+let amt=x.fields.amount;
+let cat=x.fields.category;
+
+if(!products[prod]) products[prod]={count:0,sum:0};
+
+products[prod].count++;
+products[prod].sum+=amt;
+
+categories[cat]+=amt;
+total+=amt;
+}
+});
+
+let sorted=Object.entries(products).sort((a,b)=>b[1].sum-a[1].sum);
+
+let html=`<h4>💰 Gesamt: ${total.toFixed(2)} €</h4><h4>Produkte:</h4>`;
+
+sorted.forEach(p=>{
+html+=`${p[0]} → ${p[1].count}x | ${p[1].sum.toFixed(2)} €<br>`;
+});
+
+html+=`<h4>Kategorien:</h4>
+🍺 ${categories.Getraenk.toFixed(2)} €<br>
+🍔 ${categories.Essen.toFixed(2)} €<br>
+📦 ${categories.Sonstiges.toFixed(2)} €`;
+
+productStats.innerHTML=html;
+
+// Chart
+if(statsChart) statsChart.destroy();
+
+statsChart=new Chart(document.getElementById("statsChart"),{
+type:"bar",
+data:{
+labels:sorted.map(p=>p[0]),
+datasets:[{data:sorted.map(p=>p[1].sum),backgroundColor:"#7edc8a"}]
+}
+});
+}
+
+init();
+
 </script>
 
 </body>
