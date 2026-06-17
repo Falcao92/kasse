@@ -24,6 +24,7 @@ button {
 #result {
   margin-top: 30px;
   font-size: 24px;
+  white-space: pre-line;
 }
 </style>
 </head>
@@ -57,38 +58,42 @@ async function scanNFC(){
 
         ndef.onreading = async (event) => {
 
-            try {
+            let cardId = event.serialNumber || "unknown";
 
-                let cardId = event.serialNumber || "unknown";
+            document.getElementById("result").innerText =
+                "✅ Karte erkannt: " + cardId + "\nLade Guthaben...";
 
-                document.getElementById("result").innerText =
-                    "✅ Karte erkannt: " + cardId;
+            // ✅ Delay Fix für Android NFC
+            setTimeout(async () => {
 
-                // 👉 API aufrufen
-                let res = await fetch(API_URL + "?id=" + cardId);
+                try {
 
-                if(!res.ok){
-                    throw new Error("API Fehler");
+                    let res = await fetch(API_URL + "?id=" + encodeURIComponent(cardId));
+
+                    if(!res.ok){
+                        throw new Error("HTTP " + res.status);
+                    }
+
+                    let data = await res.json();
+
+                    document.getElementById("result").innerText =
+                        "💳 Karte: " + cardId +
+                        "\n\n💰 Guthaben: " + data.balance + " €";
+
+                } catch (e) {
+
+                    console.error("API ERROR:", e);
+
+                    document.getElementById("result").innerText =
+                        "❌ Fehler beim Laden (API)";
                 }
 
-                let data = await res.json();
+            }, 300);
 
-                document.getElementById("result").innerText =
-                    "💳 Karte: " + cardId + "\n\n💰 Guthaben: " + data.balance + " €";
-
-            } catch (apiError) {
-
-                console.error(apiError);
-
-                document.getElementById("result").innerText =
-                    "❌ Fehler beim Laden (API)";
-            }
         };
 
     } catch (err) {
-
         console.error(err);
-
         alert("❌ NFC Fehler: " + err.message);
     }
 }
