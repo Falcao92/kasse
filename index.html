@@ -443,7 +443,7 @@ body:body?JSON.stringify(body):null
 }
     
 async function charge(p, qty = 1){
-
+let actualQty = p.fields.Title.includes("Kasten") ? qty * 24 : qty;
     let cardVal = document.getElementById("card").value;
 
     if(!cardVal){
@@ -478,16 +478,18 @@ if(c.fields.balance < total){
     );
 
     // Transaktion speichern
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
-        fields:{
-            card_id:cardVal,
-            amount: total,
-            type:"charge",
-            product:p.fields.Title,
-            category:p.fields.category,
-            timestamp:new Date().toISOString()
-        }
-    });
+   await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
+    fields:{
+        card_id:cardVal,
+        amount:total,
+        quantity: qty,    // ✅ NEU (WICHTIG!)
+        type:"charge",
+        product:p.fields.Title,
+        category:p.fields.category,
+        timestamp:new Date().toISOString()
+    }
+});
+
 
     showToast("✅ " + p.fields.Title);
 
@@ -675,6 +677,8 @@ if(x.fields.product){
         qty = parseInt(match[1]);
     }
 }
+
+let qty = x.fields.quantity || 1;
 
 if(x.fields.category==="Getraenk") dr += qty;
 else if(x.fields.category==="Essen") fo += qty;
