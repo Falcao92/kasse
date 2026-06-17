@@ -663,13 +663,8 @@ if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
 
 sum += x.fields.amount;
 
-// ✅ NUR EINMAL definieren!
-let qty = x.fields.quantity || 1;
+let qty = Number(x.fields.quantity) || 1;
 
-// ✅ Kasten berücksichtigen
-if(x.fields.product && x.fields.product.toLowerCase().includes("kasten")){
-    qty = qty * 24;
-}
 
 // ✅ addieren
 if(x.fields.category==="Getraenk") dr += qty;
