@@ -12,15 +12,24 @@ body { font-family: Arial; background:#f4f4f4; padding:20px;}
 .section { background:white; padding:15px; margin:15px 0; border-radius:12px;}
 
 button {
-    padding:12px;
-    margin:5px;
-    border-radius:8px;
-    border:none;
-    background:#7edc8a;
-    color:white;
-    font-weight:bold;
-    cursor:pointer;
+    width: 100%;
+    max-width: 350px;
+
+    padding: 25px;
+    margin: 8px;
+
+    font-size: 22px;
+    font-weight: bold;
+
+    border-radius: 15px;
+    border: none;
+
+    background: #4CAF50;
+    color: white;
+
+    cursor: pointer;
 }
+
 button:hover { background:#5ccf74; }
 
 .cardItem {
@@ -43,7 +52,20 @@ padding:10px;
 border-radius:6px;
 display:none;
 }
+    
+.productRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
 
+.productRow select {
+    padding: 15px;
+    font-size: 18px;
+    border-radius: 10px;
+}
+    
 .hidden { display:none; }
 </style>
 </head>
@@ -569,6 +591,7 @@ res.value.forEach(p=>{
 let container=document.createElement("div");
 
 let wrapper = document.createElement("div");
+    wrapper.className = "productRow";
 
 // Button
 let btn = document.createElement("button");
@@ -637,9 +660,25 @@ res.value.forEach(x=>{
 if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
 sum+=x.fields.amount;
 
-if(x.fields.category==="Getraenk") dr++;
-else if(x.fields.category==="Essen") fo++;
-else ot++;
+let qty = 1;
+
+    
+// Kasten erkennen
+if(x.fields.product && x.fields.product.includes("Kasten")){
+    qty = 24;
+}
+
+// Menge aus "10x Bier" rauslesen
+if(x.fields.product){
+    let match = x.fields.product.match(/^(\d+)x/);
+    if(match){
+        qty = parseInt(match[1]);
+    }
+}
+
+if(x.fields.category==="Getraenk") dr += qty;
+else if(x.fields.category==="Essen") fo += qty;
+else ot += qty;
 }
 });
 
