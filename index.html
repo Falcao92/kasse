@@ -358,15 +358,18 @@ async function topup(){
     }
 
     // Transaktion speichern
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
-        fields:{
-            card_id:cardVal,
-            amount:amountVal,
-            type:"topup",
-            product:"Aufladung",
-            timestamp:new Date().toISOString()
-        }
-    });
+  await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
+    fields:{
+        Title: "Transaction",       // ✅ PFLICHTFELD!
+        card_id: cardVal,
+        amount: Number(total),
+        quantity: Number(actualQty),
+        type: "charge",
+        product: p.fields.Title,
+        category: p.fields.category,
+        timestamp: new Date().toISOString()
+    }
+});
 
     showToast("💰 Aufgeladen: " + amountVal + "€");
 
