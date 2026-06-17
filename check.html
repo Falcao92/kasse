@@ -41,7 +41,6 @@ button {
 
 const API_URL = "https://kasse-backend-vvwu.onrender.com/api/balance";
 
-// ✅ Scan starten
 async function scanNFC(){
 
     try {
@@ -57,18 +56,18 @@ async function scanNFC(){
 
         document.getElementById("result").innerText = "📡 Scanne...";
 
-       ndef.onreading = (event) => {
+        ndef.onreading = (event) => {
 
-    let cardId = event.serialNumber || "unknown";
+            let cardId = event.serialNumber || "unknown";
 
-    document.getElementById("result").innerText =
-        "✅ Karte erkannt: " + cardId + "\nÖffne Guthaben...";
+            document.getElementById("result").innerText =
+                "✅ Karte erkannt: " + cardId + "\nÖffne Guthaben...";
 
-    // ✅ Direkt API öffnen (kein fetch!)
-    setTimeout(() => {
-        window.location.href = API_URL + "?id=" + encodeURIComponent(cardId);
-    }, 300);
-};
+            // ✅ WICHTIG: direkt Seite öffnen
+            setTimeout(() => {
+                window.location.href = API_URL + "?id=" + encodeURIComponent(cardId);
+            }, 300);
+        };
 
     } catch (err) {
         console.error(err);
@@ -76,51 +75,7 @@ async function scanNFC(){
     }
 }
 
-// ✅ stabile API Funktion mit Retry
-async function loadBalance(){
-
-    let cardId = window.lastCard;
-
-    if(!cardId) return;
-
-    let tries = 5; // ✅ mehr Versuche!
-
-    while(tries > 0){
-
-        try {
-
-            document.getElementById("result").innerText =
-                "🔄 Verbinde mit Server... (" + (6 - tries) + ")";
-
-            let res = await fetch(API_URL + "?id=" + encodeURIComponent(cardId), {
-                method: "GET",
-                cache: "no-store"
-            });
-
-            let data = await res.json();
-
-            document.getElementById("result").innerText =
-                "💳 Karte: " + cardId +
-                "\n\n💰 Guthaben: " + data.balance + " €";
-
-            return;
-
-        } catch (e) {
-
-            console.warn("Retry...", tries, e);
-
-            tries--;
-
-            // ✅ Warten zwischen Versuchen (wichtig)
-            await new Promise(r => setTimeout(r, 2000));
-        }
-    }
-
-    document.getElementById("result").innerText =
-        "❌ Server nicht erreichbar (bitte erneut scannen)";
-}
 </script>
-
 
 </body>
 </html>
