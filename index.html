@@ -33,6 +33,12 @@ button:hover { background:#5ccf74; }
     cursor:pointer;
 }
 
+select{
+    padding:10px;
+    border-radius:8px;
+    margin-left:10px;
+}
+
 .toast{
 position:fixed;
 bottom:20px;
@@ -55,10 +61,9 @@ display:none;
 <div class="section">
 <input id="card" placeholder="Karte scannen">
 </div>
-    <button onclick="scanNFC()">📡 NFC scannen</button>
-    <input id="card" placeholder="Karte scannen">
-<button onclick="clearCard()">❌</button>
 
+<button onclick="scanNFC()">📡 NFC scannen</button>
+<button onclick="clearCard()">❌</button>
 
 <div class="section">
 <h2>Produkte</h2>
@@ -67,495 +72,11 @@ display:none;
 <h3>📦 Sonstiges</h3><div id="other"></div>
 </div>
 
-<div class="section">
-<input id="amount" placeholder="Betrag">
-<button onclick="topup()">Aufladen</button>
-</div>
-
-<div class="section">
-<button onclick="refundCard()">💶 Auszahlung</button>
-</div>
-
-<div class="section">
-<button onclick="loginAdmin()">Admin</button>
-</div>
-
-<!-- ADMIN -->
-<div id="admin" class="section hidden">
-<h2>Admin</h2>
-
-<input id="name" placeholder="Produkt">
-<input id="price" placeholder="Preis">
-<select id="category">
-<option value="Getraenk">Getränk</option>
-<option value="Essen">Essen</option>
-<option value="Sonstiges">Sonstiges</option>
-</select>
-
-<button onclick="addProduct()">Speichern</button>
-
-<hr>
-
-<h3>📊 Erweiterte Auswertung</h3>
-
-Von: <input type="date" id="fromDate">
-Bis: <input type="date" id="toDate">
-
-<button onclick="loadProductStats()">Auswerten</button>
-
-<div id="productStats"></div>
-<canvas id="statsChart"></canvas>
-
-</div>
-
-<!-- DASHBOARD -->
-<div id="dashboardSection" class="section hidden">
-<h2>📊 Tages Dashboard</h2>
-<input type="date" id="date" onchange="loadDashboard()">
-
-<p>💰 Gesamt: <span id="sum">0 €</span></p>
-<p>🍺 Getränke: <span id="drinkSum">0</span></p>
-<p>🍔 Essen: <span id="foodSum">0</span></p>
-<p>📦 Sonstiges: <span id="otherSum">0</span></p>
-
-<canvas id="chart"></canvas>
-</div>
-
-<!-- KARTEN -->
-<div id="cardsSection" class="section hidden">
-<h2>💳 Karten</h2>
-<div id="cards"></div>
-
-<h3>Details</h3>
-<div id="details"></div>
-</div>
-
 <div id="toast" class="toast"></div>
 
- <hr>
-
-<h3>📥 Export</h3>
-
-<button onclick="exportCSV()">CSV Export</button>   
-
 <script>
-    function clearCard(){
-    document.getElementById("card").value = "";
-}
 
-const ADMIN_PASSWORD="1234";
-let adminMode=false;
-let chart;
-let statsChart;
-
-function showToast(text){
-let t=document.getElementById("toast");
-t.innerText=text;
-t.style.display="block";
-setTimeout(()=>t.style.display="none",2000);
-}
-
-function loginAdmin(){
-let pw=prompt("Passwort:");
-if(pw===ADMIN_PASSWORD){
-adminMode=true;
-admin.classList.remove("hidden");
-dashboardSection.classList.remove("hidden");
-cardsSection.classList.remove("hidden");
-loadProducts();
-}
-}
-
-// ✅ MSAL INIT
-const msalInstance = new msal.PublicClientApplication({
-    auth: {
-        clientId: "844062e7-0d5c-4852-88fc-5e9940f4ed66",
-        authority: "https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
-        redirectUri: window.location.href
-    }
-});
-
-// ✅ LOGIN (REDIRECT – KEIN POPUP!)
-async function loginM365(){
-
-    const accounts = msalInstance.getAllAccounts();
-
-    // Kein Login → redirect starten
-    if(accounts.length === 0){
-        await msalInstance.loginRedirect({
-            scopes:["Sites.ReadWrite.All","User.Read"]
-        });
-        return; // Seite lädt neu
-    }
-
-    // Bereits eingeloggt
-    console.log("✅ Eingeloggt:", accounts[0].username);
-}
-
-
-// ✅ TOKEN HOLEN
-async function token(){
-
-    const accounts = msalInstance.getAllAccounts();
-
-    if(accounts.length === 0){
-        await loginM365();
-    }
-
-    const response = await msalInstance.acquireTokenSilent({
-        scopes:["Sites.ReadWrite.All"],
-        account: accounts[0]
-    });
-
-    return response.accessToken;
-
-}
-
-let siteId, productsId, cardsId, transactionsId;
-
-  async function exportCSV(){
-
-    let from = document.getElementById("fromDate").value;
-    let to = document.getElementById("toDate").value;
-
-    if(!from || !to){
-        alert("Bitte Zeitraum wählen");
-        return;
-    }
-
-    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-    let rows = ["Karte,Produkt,Kategorie,Typ,Betrag,Zeit"];
-
-    res.value.forEach(x => {
-
-        let d = x.fields.timestamp?.slice(0,10);
-
-        if(d >= from && d <= to){
-
-            rows.push([
-                x.fields.card_id,
-                x.fields.product || "",
-                x.fields.category || "",
-                x.fields.type,
-                x.fields.amount,
-                x.fields.timestamp
-            ].join(","));
-        }
-    });
-
-    let blob = new Blob([rows.join("\n")], {type:"text/csv"});
-
-    let a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `export_${from}_bis_${to}.csv`;
-    a.click();
-
-    showToast("📥 Export erstellt");
-}
-  
-async function scanNFC(){
-
-    // Prüfen ob NFC unterstützt wird
-    if (!("NDEFReader" in window)) {
-        alert("❌ NFC wird auf diesem Gerät nicht unterstützt");
-        return;
-    }
-
-    try {
-
-        const ndef = new NDEFReader();
-
-        await ndef.scan();
-
-        showToast("📡 Scanner aktiv – Karte dranhalten");
-
-    ndef.onreading = (event) => {
-
-    try {
-
-        let cardId = event.serialNumber || "Unbekannt";
-
-        if(event.message.records.length > 0){
-
-            let record = event.message.records[0];
-
-            if(record.recordType === "text"){
-                const decoder = new TextDecoder(record.encoding);
-                cardId = decoder.decode(record.data);
-            }
-        }
-
-        document.getElementById("card").value = cardId;
-
-        showToast("✅ Karte erkannt: " + cardId);
-
-    } catch (err) {
-        alert("❌ Fehler beim Lesen");
-    }
-};
-
-    } catch (error) {
-        alert("❌ NFC Zugriff fehlgeschlagen: " + error);
-    }
-}
-
-    
-async function topup(){
-
-    let cardVal = document.getElementById("card").value;
-    let amountVal = parseFloat(document.getElementById("amount").value);
-
-    if(!cardVal || !amountVal){
-        alert("Karte oder Betrag fehlt");
-        return;
-    }
-
-    // Popup zur Bestätigung
-    if(!confirm(`Aufladen bestätigen?\n${amountVal} €`)){
-        return;
-    }
-
-    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-    let c = res.value.find(x=>x.fields.Title === cardVal);
-
-    if(!c){
-        // neue Karte anlegen
-        await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{
-            fields:{
-                Title:cardVal,
-                balance:amountVal
-            }
-        });
-    } else {
-        // Guthaben erhöhen
-        await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
-            "PATCH",
-            {balance: c.fields.balance + amountVal}
-        );
-    }
-
-    // Transaktion speichern
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
-        fields:{
-            card_id:cardVal,
-            amount:amountVal,
-            type:"topup",
-            product:"Aufladung",
-            timestamp:new Date().toISOString()
-        }
-    });
-
-    showToast("💰 Aufgeladen: " + amountVal + "€");
-
-    loadCards();
-}
-    async function refundCard(){
-
-    let cardVal = document.getElementById("card").value;
-
-    if(!cardVal){
-        alert("Karte fehlt");
-        return;
-    }
-
-    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-    let c = res.value.find(x=>x.fields.Title === cardVal);
-
-    if(!c){
-        alert("Karte nicht gefunden");
-        return;
-    }
-
-    let balance = c.fields.balance;
-
-    if(balance <= 0){
-        alert("Kein Guthaben vorhanden");
-        return;
-    }
-
-    // Popup bestätigen
-    if(!confirm(`Auszahlen?\n${balance} €`)){
-        return;
-    }
-
-    // Guthaben auf 0 setzen
-    await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
-        "PATCH",
-        {balance: 0}
-    );
-
-    // Transaktion speichern
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
-        fields:{
-            card_id:cardVal,
-            amount:balance,
-            type:"refund",
-            product:"Auszahlung",
-            timestamp:new Date().toISOString()
-        }
-    });
-
-    showToast("💶 Auszahlung: " + balance + "€");
-
-    loadCards();
-    loadDashboard();
-}
-
-    
-async function token(){
-let acc=msalInstance.getAllAccounts();
-if(acc.length===0){
-return (await msalInstance.loginPopup({scopes:["Sites.ReadWrite.All"]})).accessToken;
-}
-return (await msalInstance.acquireTokenSilent({scopes:["Sites.ReadWrite.All"],account:acc[0]})).accessToken;
-}
-
-async function graph(url,method="GET",body=null){
-let t=await token();
-return (await fetch("https://graph.microsoft.com/v1.0"+url,{
-method,
-headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},
-body:body?JSON.stringify(body):null
-})).json();
-}
-    
-async function charge(p){
-
-    let cardVal = document.getElementById("card").value;
-
-    if(!cardVal){
-        alert("Bitte Karte eingeben");
-        return;
-    }
-
-    // ✅ Popup bestätigen
-    if(!confirm(`Kauf bestätigen?\n${p.fields.Title} - ${p.fields.price} €`)){
-        return;
-    }
-
-    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-    let c = res.value.find(x=>x.fields.Title===cardVal);
-
-    if(!c){
-        alert("Karte nicht gefunden");
-        return;
-    }
-
-    if(c.fields.balance < p.fields.price){
-        alert("Zu wenig Guthaben");
-        return;
-    }
-
-    // Guthaben abziehen
-    await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
-        "PATCH",
-        {balance: c.fields.balance - p.fields.price}
-    );
-
-    // Transaktion speichern
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
-        fields:{
-            card_id:cardVal,
-            amount:p.fields.price,
-            type:"charge",
-            product:p.fields.Title,
-            category:p.fields.category,
-            timestamp:new Date().toISOString()
-        }
-    });
-
-    showToast("✅ " + p.fields.Title);
-
-    loadDashboard();
-    loadCards();
-}
-
- async function loadCards(){
-
-    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-
-    document.getElementById("cards").innerHTML = res.value.map(c => `
-        <div class="cardItem" onclick="showDetails('${c.fields.Title}')">
-            ${c.fields.Title} → ${c.fields.balance} €
-        </div>
-    `).join("");
-}
-
- async function showDetails(cardId){
-
-    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-    let list = res.value
-        .filter(x => x.fields.card_id === cardId)
-        .sort((a,b)=> new Date(b.fields.timestamp) - new Date(a.fields.timestamp));
-
-    let html = `<h3>${cardId}</h3>`;
-
-    if(list.length === 0){
-        html += "Keine Buchungen";
-    } else {
-
-        list.forEach(x => {
-
-            let date = new Date(x.fields.timestamp).toLocaleString("de-DE");
-
-            let label = "Kauf";
-            let color = "#2196F3";
-
-            if(x.fields.type==="topup"){
-                label="Aufladung"; color="#4CAF50";
-            }
-
-            if(x.fields.type==="refund"){
-                label="Auszahlung"; color="#f44336";
-            }
-
-            html += `
-            <div class="tx" style="border-left-color:${color}">
-                <b>${label}</b><br>
-                ${x.fields.product || ""}<br>
-                <small>${date}</small><br>
-                <b>${x.fields.amount} €</b>
-            </div>
-            `;
-        });
-    }
-
-    document.getElementById("details").innerHTML = html;
-}
-   
-    
-
-async function init(){
-
-
-    await msalInstance.handleRedirectPromise(); // ✅ ganz oben
-    await loginM365();                          // ✅ direkt danach
-
-date.value=new Date().toISOString().slice(0,10);
-fromDate.value=date.value;
-toDate.value=date.value;
-
-let t=await token();
-let site=await (await fetch(
-"https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
-{headers:{Authorization:"Bearer "+t}}
-)).json();
-
-siteId=site.id;
-
-let lists=await graph(`/sites/${siteId}/lists`);
-productsId=lists.value.find(l=>l.displayName==="products").id;
-cardsId=lists.value.find(l=>l.displayName==="cards").id;
-transactionsId=lists.value.find(l=>l.displayName==="transactions").id;
-
-loadProducts();
-loadDashboard();
-loadCards();
-}
-
-// PRODUKTE + ADMIN EDIT
+// ✅ PRODUKTE LADEN MIT MENGEN-DROPDOWN
 async function loadProducts(){
 
 let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
@@ -566,140 +87,98 @@ res.value.forEach(p=>{
 
 let container=document.createElement("div");
 
+// Wrapper
+let wrapper=document.createElement("div");
+
+// Button
 let btn=document.createElement("button");
 btn.innerText=p.fields.Title+" "+p.fields.price+"€";
-btn.onclick=()=>charge(p);
-container.appendChild(btn);
 
-// ADMIN CONTROLS
-if(adminMode){
-
-let edit=document.createElement("button");
-edit.innerText="✏️";
-edit.onclick=async()=>{
-let np=prompt("Neuer Preis",p.fields.price);
-await graph(`/sites/${siteId}/lists/${productsId}/items/${p.id}/fields`,"PATCH",{price:parseFloat(np)});
-loadProducts();
-};
-
-let del=document.createElement("button");
-del.innerText="🗑";
-del.onclick=async()=>{
-if(!confirm("Löschen?"))return;
-let t=await token();
-await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${productsId}/items/${p.id}`,{
-method:"DELETE",
-headers:{Authorization:"Bearer "+t}
-});
-loadProducts();
-};
-
-container.appendChild(edit);
-container.appendChild(del);
+// Dropdown
+let select=document.createElement("select");
+for(let i=1;i<=10;i++){
+    let opt=document.createElement("option");
+    opt.value=i;
+    opt.innerText=i+"x";
+    select.appendChild(opt);
 }
 
+// Klick
+btn.onclick=()=>charge(p, parseInt(select.value));
+
+wrapper.appendChild(btn);
+wrapper.appendChild(select);
+container.appendChild(wrapper);
+
+// Kategorie
 let cat=p.fields.category;
 (cat==="Getraenk"?drink:cat==="Essen"?food:other).appendChild(container);
 
 });
 }
 
-// DASHBOARD FIX
-async function loadDashboard(){
+// ✅ CHARGE MIT MENGE
+async function charge(p, qty=1){
 
-let d=date.value;
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+let cardVal=document.getElementById("card").value;
 
-let sum=0,dr=0,fo=0,ot=0;
+if(!cardVal){
+    alert("Bitte Karte eingeben");
+    return;
+}
 
-res.value.forEach(x=>{
-if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
-sum+=x.fields.amount;
+let total=p.fields.price*qty;
 
-if(x.fields.category==="Getraenk") dr++;
-else if(x.fields.category==="Essen") fo++;
-else ot++;
+if(!confirm(`${qty}x ${p.fields.Title}\nGesamt: ${total} €`)){
+    return;
+}
+
+let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+let c=res.value.find(x=>x.fields.Title===cardVal);
+
+if(!c){
+    alert("Karte nicht gefunden");
+    return;
+}
+
+if(c.fields.balance<total){
+    alert("Zu wenig Guthaben");
+    return;
+}
+
+// Guthaben
+await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
+"PATCH",
+{balance:c.fields.balance-total}
+);
+
+// Transaktion
+await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
+fields:{
+    card_id:cardVal,
+    amount:total,
+    type:"charge",
+    product:`${qty}x ${p.fields.Title}`,
+    category:p.fields.category,
+    timestamp:new Date().toISOString()
 }
 });
 
-document.getElementById("sum").innerText = sum + " €";
-drinkSum.innerText=dr;
-foodSum.innerText=fo;
-otherSum.innerText=ot;
+showToast(`✅ ${qty}x ${p.fields.Title}`);
 
-if(chart) chart.destroy();
-
-chart = new Chart(document.getElementById("chart"), {
-    type: "bar",
-    data: {
-        labels: ["Getränke","Essen","Sonstiges"],
-        datasets: [{
-            label: "Anzahl Verkäufe",   // ✅ wichtig!
-            data: [dr, fo, ot]
-        }]
-    }
-});
+loadCards();
+loadDashboard();
 }
 
-// ✅ ERWEITERTE AUSWERTUNG
-async function loadProductStats(){
-
-let from=fromDate.value;
-let to=toDate.value;
-
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-let products={}, categories={Getraenk:0,Essen:0,Sonstiges:0}, total=0;
-
-res.value.forEach(x=>{
-let d=x.fields.timestamp?.slice(0,10);
-
-if(d>=from && d<=to && x.fields.type==="charge"){
-
-let prod=x.fields.product;
-let amt=x.fields.amount;
-let cat=x.fields.category;
-
-if(!products[prod]) products[prod]={count:0,sum:0};
-
-products[prod].count++;
-products[prod].sum+=amt;
-
-categories[cat]+=amt;
-total+=amt;
+// ✅ TOAST
+function showToast(text){
+let t=document.getElementById("toast");
+t.innerText=text;
+t.style.display="block";
+setTimeout(()=>t.style.display="none",2000);
 }
-});
-
-let sorted=Object.entries(products).sort((a,b)=>b[1].sum-a[1].sum);
-
-let html=`<h4>💰 Gesamt: ${total.toFixed(2)} €</h4><h4>Produkte:</h4>`;
-
-sorted.forEach(p=>{
-html+=`${p[0]} → ${p[1].count}x | ${p[1].sum.toFixed(2)} €<br>`;
-});
-
-html+=`<h4>Kategorien:</h4>
-🍺 ${categories.Getraenk.toFixed(2)} €<br>
-🍔 ${categories.Essen.toFixed(2)} €<br>
-📦 ${categories.Sonstiges.toFixed(2)} €`;
-
-productStats.innerHTML=html;
-
-// Chart
-if(statsChart) statsChart.destroy();
-
-statsChart=new Chart(document.getElementById("statsChart"),{
-type:"bar",
-data:{
-labels:sorted.map(p=>p[0]),
-datasets:[{data:sorted.map(p=>p[1].sum),backgroundColor:"#7edc8a"}]
-}
-});
-}
-
-init();
-    
 
 </script>
+
 </body>
 </html>
