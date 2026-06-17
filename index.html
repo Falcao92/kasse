@@ -755,6 +755,53 @@ datasets:[{data:sorted.map(p=>p[1].sum),backgroundColor:"#7edc8a"}]
 }
 
 init();
+
+    async function addProduct(){
+
+    const name = document.getElementById("name").value.trim();
+    const price = parseFloat(document.getElementById("price").value);
+    const category = document.getElementById("category").value;
+
+    // ✅ Validierung
+    if(!name){
+        alert("Produktname fehlt");
+        return;
+    }
+
+    if(isNaN(price)){
+        alert("Preis ungültig");
+        return;
+    }
+
+    try {
+
+        let response = await graph(
+            `/sites/${siteId}/lists/${productsId}/items`,
+            "POST",
+            {
+                fields: {
+                    Title: name,
+                    price: price,         // ✅ WICHTIG: exakt wie Spaltenname!
+                    category: category    // ✅ WICHTIG
+                }
+            }
+        );
+
+        console.log("Produkt erstellt:", response);
+
+        showToast("✅ Produkt gespeichert");
+
+        // Felder leeren
+        document.getElementById("name").value = "";
+        document.getElementById("price").value = "";
+
+        loadProducts();
+
+    } catch (err){
+        console.error(err);
+        alert("❌ Fehler beim Speichern (Details in Konsole)");
+    }
+}
     
 
 </script>
