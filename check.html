@@ -85,20 +85,19 @@ async function loadBalance(){
 
     if(!cardId) return;
 
-    let tries = 3;
+    let tries = 5; // ✅ mehr Versuche!
 
     while(tries > 0){
 
         try {
 
+            document.getElementById("result").innerText =
+                "🔄 Verbinde mit Server... (" + (6 - tries) + ")";
+
             let res = await fetch(API_URL + "?id=" + encodeURIComponent(cardId), {
                 method: "GET",
-                cache: "no-store"   // 🔥 wichtig!
+                cache: "no-store"
             });
-
-            if(!res.ok){
-                throw new Error("HTTP " + res.status);
-            }
 
             let data = await res.json();
 
@@ -114,14 +113,14 @@ async function loadBalance(){
 
             tries--;
 
-            await new Promise(r => setTimeout(r, 1000));
+            // ✅ Warten zwischen Versuchen (wichtig)
+            await new Promise(r => setTimeout(r, 2000));
         }
     }
 
     document.getElementById("result").innerText =
-        "❌ Server nicht erreichbar";
+        "❌ Server nicht erreichbar (bitte erneut scannen)";
 }
-
 </script>
 
 
