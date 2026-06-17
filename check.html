@@ -41,7 +41,7 @@ button {
 
 const API_URL = "https://kasse-backend-vvwu.onrender.com/api/balance";
 
-// ✅ NFC starten
+// ✅ Scan starten
 async function scanNFC(){
 
     try {
@@ -66,10 +66,10 @@ async function scanNFC(){
             document.getElementById("result").innerText =
                 "✅ Karte erkannt: " + cardId + "\nLade Guthaben...";
 
-            // ✅ WICHTIG: getrennt vom NFC Event
-            setTimeout(() => {
-                loadBalance();
-            }, 300);
+            // ✅ WICHTIG: API komplett entkoppeln
+            requestAnimationFrame(() => {
+                setTimeout(loadBalance, 500);
+            });
         };
 
     } catch (err) {
@@ -78,37 +78,52 @@ async function scanNFC(){
     }
 }
 
-// ✅ API sauber getrennt
+// ✅ stabile API Funktion mit Retry
 async function loadBalance(){
 
     let cardId = window.lastCard;
 
     if(!cardId) return;
 
-    try {
+    let tries = 3;
 
-        let res = await fetch(API_URL + "?id=" + encodeURIComponent(cardId));
+    while(tries > 0){
 
-        if(!res.ok){
-            throw new Error("HTTP " + res.status);
+        try {
+
+            let res = await fetch(API_URL + "?id=" + encodeURIComponent(cardId), {
+                method: "GET",
+                cache: "no-store"   // 🔥 wichtig!
+            });
+
+            if(!res.ok){
+                throw new Error("HTTP " + res.status);
+            }
+
+            let data = await res.json();
+
+            document.getElementById("result").innerText =
+                "💳 Karte: " + cardId +
+                "\n\n💰 Guthaben: " + data.balance + " €";
+
+            return;
+
+        } catch (e) {
+
+            console.warn("Retry...", tries, e);
+
+            tries--;
+
+            await new Promise(r => setTimeout(r, 1000));
         }
-
-        let data = await res.json();
-
-        document.getElementById("result").innerText =
-            "💳 Karte: " + cardId +
-            "\n\n💰 Guthaben: " + data.balance + " €";
-
-    } catch (e) {
-
-        console.error("API ERROR:", e);
-
-        document.getElementById("result").innerText =
-            "❌ Fehler beim Laden (API)";
     }
+
+    document.getElementById("result").innerText =
+        "❌ Server nicht erreichbar";
 }
 
 </script>
+
 
 </body>
 </html>
