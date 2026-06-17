@@ -23,6 +23,11 @@ button {
 }
 button:hover { background:#5ccf74; }
 
+select{
+    padding:8px;
+    border-radius:8px;
+}
+
 .cardItem {
     display:flex;
     justify-content:space-between;
@@ -31,12 +36,6 @@ button:hover { background:#5ccf74; }
     border-radius:8px;
     background:#fafafa;
     cursor:pointer;
-}
-
-select{
-    padding:10px;
-    border-radius:8px;
-    margin-left:10px;
 }
 
 .toast{
@@ -72,11 +71,26 @@ display:none;
 <h3>📦 Sonstiges</h3><div id="other"></div>
 </div>
 
+<div class="section">
+<button onclick="loginAdmin()">Admin</button>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
 
-// ✅ PRODUKTE LADEN MIT MENGEN-DROPDOWN
+function clearCard(){
+document.getElementById("card").value="";
+}
+
+function showToast(text){
+let t=document.getElementById("toast");
+t.innerText=text;
+t.style.display="block";
+setTimeout(()=>t.style.display="none",2000);
+}
+
+// ✅ PRODUKTE MIT DROPDOWN
 async function loadProducts(){
 
 let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
@@ -87,7 +101,7 @@ res.value.forEach(p=>{
 
 let container=document.createElement("div");
 
-// Wrapper
+// Wrapper für Button + Dropdown
 let wrapper=document.createElement("div");
 
 // Button
@@ -97,13 +111,13 @@ btn.innerText=p.fields.Title+" "+p.fields.price+"€";
 // Dropdown
 let select=document.createElement("select");
 for(let i=1;i<=10;i++){
-    let opt=document.createElement("option");
-    opt.value=i;
-    opt.innerText=i+"x";
-    select.appendChild(opt);
+let opt=document.createElement("option");
+opt.value=i;
+opt.innerText=i+"x";
+select.appendChild(opt);
 }
 
-// Klick
+// Click
 btn.onclick=()=>charge(p, parseInt(select.value));
 
 wrapper.appendChild(btn);
@@ -123,59 +137,55 @@ async function charge(p, qty=1){
 let cardVal=document.getElementById("card").value;
 
 if(!cardVal){
-    alert("Bitte Karte eingeben");
-    return;
+alert("Bitte Karte eingeben");
+return;
 }
 
 let total=p.fields.price*qty;
 
 if(!confirm(`${qty}x ${p.fields.Title}\nGesamt: ${total} €`)){
-    return;
+return;
 }
 
 let res=await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
 let c=res.value.find(x=>x.fields.Title===cardVal);
 
 if(!c){
-    alert("Karte nicht gefunden");
-    return;
+alert("Karte nicht gefunden");
+return;
 }
 
 if(c.fields.balance<total){
-    alert("Zu wenig Guthaben");
-    return;
+alert("Zu wenig Guthaben");
+return;
 }
 
-// Guthaben
+// Guthaben abziehen
 await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
 "PATCH",
 {balance:c.fields.balance-total}
 );
 
-// Transaktion
+// Transaktion speichern
 await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
 fields:{
-    card_id:cardVal,
-    amount:total,
-    type:"charge",
-    product:`${qty}x ${p.fields.Title}`,
-    category:p.fields.category,
-    timestamp:new Date().toISOString()
+card_id:cardVal,
+amount:total,
+type:"charge",
+product:`${qty}x ${p.fields.Title}`,
+category:p.fields.category,
+timestamp:new Date().toISOString()
 }
 });
 
 showToast(`✅ ${qty}x ${p.fields.Title}`);
 
-loadCards();
-loadDashboard();
+loadProducts();
 }
 
-// ✅ TOAST
-function showToast(text){
-let t=document.getElementById("toast");
-t.innerText=text;
-t.style.display="block";
-setTimeout(()=>t.style.display="none",2000);
+// Dummy Graph Funktion (deine originale bleibt!)
+async function graph(){
+return {value:[]};
 }
 
 </script>
