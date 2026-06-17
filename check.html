@@ -42,23 +42,55 @@ const API_URL = "https://kasse-backend-vwvu.onrender.com/api/balance";
 
 async function scanNFC(){
 
-try {
+    try {
 
-    let res = await fetch(API_URL + "?id=" + cardId);
+        if (!("NDEFReader" in window)) {
+            alert("❌ NFC nicht unterstützt");
+            return;
+        }
 
-    if(!res.ok){
-        throw new Error("API nicht erreichbar");
+        const ndef = new NDEFReader();
+
+        await ndef.scan();
+
+        document.getElementById("result").innerText = "📡 Scanne...";
+
+        ndef.onreading = async (event) => {
+
+            try {
+
+                let cardId = event.serialNumber || "unknown";
+
+                document.getElementById("result").innerText =
+                    "✅ Karte erkannt: " + cardId;
+
+                // 👉 API aufrufen
+                let res = await fetch(API_URL + "?id=" + cardId);
+
+                if(!res.ok){
+                    throw new Error("API Fehler");
+                }
+
+                let data = await res.json();
+
+                document.getElementById("result").innerText =
+                    "💳 Karte: " + cardId + "\n\n💰 Guthaben: " + data.balance + " €";
+
+            } catch (apiError) {
+
+                console.error(apiError);
+
+                document.getElementById("result").innerText =
+                    "❌ Fehler beim Laden (API)";
+            }
+        };
+
+    } catch (err) {
+
+        console.error(err);
+
+        alert("❌ NFC Fehler: " + err.message);
     }
-
-    let data = await res.json();
-
-    document.getElementById("result").innerText =
-        "💳 Karte: " + cardId + "\n\n💰 Guthaben: " + data.balance + " €";
-
-} catch(e){
-
-    document.getElementById("result").innerText =
-        "❌ Fehler beim Laden (Server evtl. inaktiv – nochmal versuchen)";
 }
 
 </script>
