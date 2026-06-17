@@ -75,7 +75,7 @@ display:none;
 <h1>Vereinskasse</h1>
 
 <div class="section">
-<input id="card" placeholder="Karte scannen">
+
 </div>
     <button onclick="scanNFC()">📡 NFC scannen</button>
     <input id="card" placeholder="Karte scannen">
@@ -482,7 +482,7 @@ if(c.fields.balance < total){
     fields:{
         card_id:cardVal,
         amount:total,
-        quantity: qty,    // ✅ NEU (WICHTIG!)
+        quantity: actualQty,    // ✅ NEU (WICHTIG!)
         type:"charge",
         product:p.fields.Title,
         category:p.fields.category,
@@ -491,7 +491,7 @@ if(c.fields.balance < total){
 });
 
 
-    showToast("✅ " + p.fields.Title);
+ showToast(`✅ ${qty}x ${p.fields.Title}`);
 
     loadDashboard();
     loadCards();
@@ -658,31 +658,24 @@ let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=field
 
 let sum=0,dr=0,fo=0,ot=0;
 
-res.value.forEach(x=>{
+res.value.forEach(x => {
 if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
-sum+=x.fields.amount;
 
-let qty = 1;
+sum += x.fields.amount;
 
-    
-// Kasten erkennen
-if(x.fields.product && x.fields.product.includes("Kasten")){
-    qty = 24;
-}
-
-// Menge aus "10x Bier" rauslesen
-if(x.fields.product){
-    let match = x.fields.product.match(/^(\d+)x/);
-    if(match){
-        qty = parseInt(match[1]);
-    }
-}
-
+// ✅ NUR EINMAL definieren!
 let qty = x.fields.quantity || 1;
 
+// ✅ Kasten berücksichtigen
+if(x.fields.product && x.fields.product.toLowerCase().includes("kasten")){
+    qty = qty * 24;
+}
+
+// ✅ addieren
 if(x.fields.category==="Getraenk") dr += qty;
 else if(x.fields.category==="Essen") fo += qty;
 else ot += qty;
+
 }
 });
 
