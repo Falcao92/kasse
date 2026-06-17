@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-
 body {
   font-family: Arial;
   text-align: center;
@@ -14,39 +13,43 @@ body {
   background: #f4f4f4;
 }
 
-/* ✅ großer Titel */
 h1 {
   font-size: 28px;
 }
 
-/* ✅ große Erklärung */
 .info {
   margin: 20px 0;
   font-size: 18px;
-  line-height: 1.4;
 }
 
-/* ✅ großer Button */
 button {
   width: 90%;
   max-width: 400px;
   padding: 25px;
-  font-size: 24px;
+  font-size: 22px;
   border-radius: 15px;
   border: none;
   background: #4CAF50;
   color: white;
-  margin-top: 20px;
+  margin-top: 15px;
 }
 
-/* ✅ Statusanzeige */
+input {
+  width: 90%;
+  max-width: 400px;
+  padding: 15px;
+  font-size: 18px;
+  margin-top: 20px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+}
+
 #result {
-  margin-top: 30px;
-  font-size: 22px;
+  margin-top: 25px;
+  font-size: 20px;
   white-space: pre-line;
 }
 
-/* ✅ Hinweis Box */
 .hint {
   margin-top: 40px;
   background: white;
@@ -56,7 +59,6 @@ button {
   max-width: 500px;
   margin-left: auto;
   margin-right: auto;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
 }
 
 </style>
@@ -67,62 +69,104 @@ button {
 <h1>💳 Guthaben prüfen</h1>
 
 <div class="info">
-    📱 Halte dein Handy an die Karte<br>
-    und tippe auf "Scannen"
+👉 Wähle eine Methode:
 </div>
 
-<button onclick="scanNFC()">
-    📡 NFC SCANNEN
-</button>
+<!-- ✅ NFC -->
+<button onclick="scanNFC()">📡 NFC scannen (Android)</button>
 
-<div id="result">
-    Bitte Karte scannen
-</div>
+<!-- ✅ QR -->
+<button onclick="scanQR()">📷 QR-Code scannen (iPhone)</button>
+
+<!-- ✅ MANUELL -->
+<input id="manual" placeholder="Kartennummer eingeben">
+<button onclick="manualCheck()">🔎 Guthaben anzeigen</button>
+
+<div id="result">Bereit</div>
 
 <div class="hint">
-    <b>ℹ️ Hinweis</b><br><br>
-    ✅ Funktioniert nur mit <b>Android + Google Chrome</b><br>
-    ✅ NFC muss im Handy aktiviert sein<br><br>
-    📍 NFC aktivieren:<br>
-    Einstellungen → Verbindungen → NFC
+<b>ℹ️ Hinweise</b><br><br>
+
+📡 NFC: nur Android + Chrome<br>
+📱 iPhone: bitte QR-Code scannen<br><br>
+
+NFC aktivieren:<br>
+Einstellungen → Verbindungen → NFC
 </div>
 
 <script>
 
 const API_URL = "https://kasse-backend-vvwu.onrender.com/api/balance";
 
+//
+// ✅ NFC (Android)
+//
 async function scanNFC(){
+
+    if (!("NDEFReader" in window)) {
+        alert("❌ NFC geht nur auf Android + Chrome");
+        return;
+    }
 
     try {
 
-        if (!("NDEFReader" in window)) {
-            alert("❌ NFC wird nicht unterstützt.\nNutze Android + Chrome");
-            return;
-        }
-
         const ndef = new NDEFReader();
-
         await ndef.scan();
 
         document.getElementById("result").innerText = "📡 Scanne...";
 
         ndef.onreading = (event) => {
 
-            let cardId = event.serialNumber || "unknown";
+            let id = event.serialNumber || "unknown";
 
             document.getElementById("result").innerText =
                 "✅ Karte erkannt\nÖffne Guthaben...";
 
-            // ✅ stabile Lösung → Seite öffnen
             setTimeout(() => {
-                window.location.href = API_URL + "?id=" + encodeURIComponent(cardId);
+                openCard(id);
             }, 300);
         };
 
     } catch (err) {
-        console.error(err);
         alert("❌ NFC Fehler: " + err.message);
     }
+}
+
+//
+// ✅ QR Scanner (funktioniert auf iPhone)
+//
+async function scanQR(){
+
+    if (!navigator.mediaDevices) {
+        alert("❌ Kamera nicht verfügbar");
+        return;
+    }
+
+    alert("👉 Bitte Kamera verwenden (oder QR mit Kamera App scannen)");
+
+    // Hinweis: Browser QR ist eingeschränkt → meist Kamera-App nutzen
+}
+
+//
+// ✅ MANUELLE EINGABE
+//
+function manualCheck(){
+
+    let id = document.getElementById("manual").value;
+
+    if(!id){
+        alert("Bitte Kartennummer eingeben");
+        return;
+    }
+
+    openCard(id);
+}
+
+//
+// ✅ ZENTRALE FUNKTION
+//
+function openCard(id){
+    window.location.href = API_URL + "?id=" + encodeURIComponent(id);
 }
 
 </script>
