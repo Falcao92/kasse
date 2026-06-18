@@ -130,9 +130,6 @@ Bis: <input type="date" id="toDate">
 
 </div>
 
-<!-- DASHBOARD -->
-
-
 <!-- KARTEN -->
 <div id="cardsSection" class="section hidden">
 <h2>💳 Karten</h2>
@@ -168,13 +165,12 @@ setTimeout(()=>t.style.display="none",2000);
 }
 
 function loginAdmin(){
-let pw=prompt("Passwort:");
-if(pw===ADMIN_PASSWORD){
-adminMode=true;
-admin.classList.remove("hidden");
-cardsSection.classList.remove("hidden");
-loadProducts();
-}
+    let pw=prompt("Passwort:");
+    if(pw===ADMIN_PASSWORD){
+        adminMode=true;
+        document.getElementById("admin").classList.remove("hidden");
+        document.getElementById("cardsSection").classList.remove("hidden");
+    }
 }
 
 // ✅ MSAL INIT
