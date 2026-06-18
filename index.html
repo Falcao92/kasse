@@ -358,22 +358,25 @@ async function topup(){
     }
 
     // Transaktion speichern
-  await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
+  // ✅ Transaktion speichern (AUFLADUNG)
+await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
     fields:{
-        Title: "Transaction",       // ✅ PFLICHTFELD!
+        Title: "Topup",
         card_id: cardVal,
-        amount: Number(total),
-        quantity: Number(actualQty),
-        type: "charge",
-        product: p.fields.Title,
-        category: p.fields.category,
+        amount: amountVal,      // ✅ RICHTIG
+        quantity: 1,            // ✅ optional
+        type: "topup",          // ✅ WICHTIG
+        product: "Aufladung",   // ✅ anzeigen im Verlauf
+        category: "Topup",      // ✅ optional
         timestamp: new Date().toISOString()
     }
 });
 
+
     showToast("💰 Aufgeladen: " + amountVal + "€");
 
     loadCards();
+    console.log("Topup:", cardVal, amountVal);
 }
     async function refundCard(){
 
@@ -413,9 +416,9 @@ async function topup(){
     // Transaktion speichern
     await graph(`/sites/${siteId}/lists/${transactionsId}/items`,"POST",{
         fields:{
+            Title: "Refund",
             card_id:cardVal,
-            amount:balance,
-            type:"refund",
+            amount:balance,            
             product:"Auszahlung",
             timestamp:new Date().toISOString()
         }
@@ -483,6 +486,7 @@ if(c.fields.balance < total){
     // Transaktion speichern
    await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
     fields:{
+        Title: "Transaction",
         card_id:cardVal,
         amount:total,
         quantity: actualQty,    // ✅ NEU (WICHTIG!)
