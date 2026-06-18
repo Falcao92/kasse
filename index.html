@@ -8,6 +8,18 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
+        @media (max-width: 900px) {
+
+    .productGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    button {
+        font-size: 16px;
+        padding: 15px;
+    }
+}
+    
 body { font-family: Arial; background:#f4f4f4; padding:20px;}
 .section { background:white; padding:15px; margin:15px 0; border-radius:12px;}
 
@@ -53,12 +65,11 @@ border-radius:6px;
 display:none;
 }
     
+
 .productRow {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
+    flex-direction: column;   /* statt nebeneinander */
 }
+
 
 .productRow select {
     padding: 15px;
@@ -71,7 +82,10 @@ display:none;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 10px;
 }
-
+    
+.productGrid div {
+    height: 100%;
+}
     
 .hidden { display:none; }
 </style>
@@ -823,7 +837,7 @@ async function exportPDF(){
         let img = new Image();
         img.src = logo;
 
-        doc.addImage(img, "PNG", 10, 10, 30, 30);
+        doc.addImage(img, "JPEG", 10, 10, 30, 30);
     }catch(e){
         console.warn("Logo konnte nicht geladen werden");
     }
@@ -938,17 +952,7 @@ function processData(res, from, to){
     return { total, products, categories, sorted };
 }
 
-    @media (max-width: 900px) {
 
-    .productGrid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    button {
-        font-size: 16px;
-        padding: 15px;
-    }
-}
     init();
     
 
