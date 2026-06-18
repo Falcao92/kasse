@@ -629,62 +629,12 @@ if(!from || !to){
     return;
 }
 
-let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-let total = 0;
-
-// Produkte
-let products = {};
-
-// Kategorien
-let categories = {
-    Getraenk: 0,
-    Essen: 0,
-    Sonstiges: 0
-};
-
-res.value.forEach(x =>{
-
-    let d = x.fields.timestamp?.slice(0,10);
-
-    if(d >= from && d <= to && x.fields.type === "charge"){
-
-        let qty = Number(x.fields.quantity) || 1;
-        let price = Number(x.fields.amount) || 0;
-        let prod = x.fields.product;
-        let cat = x.fields.category || "Sonstiges";
-
-        total += price;
-
-        // ✅ Produkte
-        if(!products[prod]){
-            products[prod] = { count: 0, sum: 0 };
-        }
-
-        products[prod].count += qty;
-        products[prod].sum += price;
-
-        // ✅ Kategorien Umsatz
-        if(categories[cat] !== undefined){
-            categories[cat] += price;
-        } else {
-            categories.Sonstiges += price;
-        }
-    }
-});
-
-// Sortierung nach Umsatz
-let sorted = Object.entries(products)
-    .sort((a,b) => b[1].count - a[1].count);
-
-// ✅ HTML Anzeige
 let html = `
-<h3>💰 Gesamt: ${total.toFixed(2)} €</h3>
-
+<h3>💰 Gesamt: ${data.total.toFixed(2)} €</h3>
 <h4>📦 Produkte:</h4>
 `;
 
-sorted.forEach(p =>{
+data.sorted.forEach(p => {
     html += `
     ${p[0]} → ${p[1].count}x | ${p[1].sum.toFixed(2)} €<br>
     `;
@@ -692,12 +642,13 @@ sorted.forEach(p =>{
 
 html += `
 <h4>📊 Kategorien Umsatz:</h4>
-🍺 Getränke: ${categories.Getraenk.toFixed(2)} €<br>
-🍔 Essen: ${categories.Essen.toFixed(2)} €<br>
-📦 Sonstiges: ${categories.Sonstiges.toFixed(2)} €
+🍺 Getränke: ${data.categories.Getraenk.toFixed(2)} €<br>
+🍔 Essen: ${data.categories.Essen.toFixed(2)} €<br>
+📦 Sonstiges: ${data.categories.Sonstiges.toFixed(2)} €
 `;
 
 productStats.innerHTML = html;
+
 
 // ✅ CHART (Produkte)
 if(statsChart) statsChart.destroy();
@@ -708,7 +659,7 @@ statsChart = new Chart(document.getElementById("statsChart"), {
         labels: sorted.map(p => p[0]),
         datasets: [{
             label: "Verkäufe",
-           data: sorted.map(p => p[1].count),
+           data: data.sorted.map(p => p[1].sum
             backgroundColor: "#4CAF50"
         }]
     }
@@ -766,8 +717,8 @@ statsChart = new Chart(document.getElementById("statsChart"), {
 
 async function exportCSV(){
 
-    let from = document.getElementById("fromDate").value;
-    let to = document.getElementById("toDate").value;
+    let from = fromDate.value;
+    let to = toDate.value;
 
     if(!from || !to){
         alert("Bitte Zeitraum wählen");
@@ -776,36 +727,92 @@ async function exportCSV(){
 
     let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
 
-    let rows = ["Karte,Produkt,Menge,Kategorie,Typ,Betrag,Zeit"];
+    let data = processData(res, from, to);
 
-    res.value.forEach(x => {
+    let rows = [
+        "Produkt,Menge,Umsatz"
+    ];
 
-        let d = x.fields.timestamp?.slice(0,10);
-
-        if(d >= from && d <= to){
-
-            rows.push([
-                x.fields.card_id,
-                x.fields.product || "",
-                x.fields.quantity || 1,
-                x.fields.category || "",
-                x.fields.type,
-                x.fields.amount,
-                x.fields.timestamp
-            ].join(","));
-        }
+    data.sorted.forEach(p => {
+        rows.push([
+            p[0],
+            p[1].count,
+            p[1].sum.toFixed(2)
+        ].join(","));
     });
+
+    // ✅ Kategorien zusätzlich
+    rows.push("");
+    rows.push("Kategorie,Umsatz");
+
+    rows.push(`Getraenk,${data.categories.Getraenk.toFixed(2)}`);
+    rows.push(`Essen,${data.categories.Essen.toFixed(2)}`);
+    rows.push(`Sonstiges,${data.categories.Sonstiges.toFixed(2)}`);
+
+    // ✅ Gesamt
+    rows.push("");
+    rows.push(`Gesamt,${data.total.toFixed(2)}`);
 
     let blob = new Blob([rows.join("\n")], {type:"text/csv"});
 
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `export_${from}_bis_${to}.csv`;
+    a.download = `report_${from}_${to}.csv`;
     a.click();
 
-    showToast("📥 Export erstellt");
+    showToast("📥 Export fertig (Dashboard = CSV)");
 }
+
+function processData(res, from, to){
+
+    let products = {};
+    let categories = {
+        Getraenk: 0,
+        Essen: 0,
+        Sonstiges: 0
+    };
+
+    let total = 0;
+
+    res.value.forEach(x => {
+
+        let d = x.fields.timestamp?.slice(0,10);
+
+        if(d >= from && d <= to && x.fields.type === "charge"){
+
+            let prod = x.fields.product;
+            let qty = Number(x.fields.quantity) || 1;
+            let amount = Number(x.fields.amount) || 0;
+            let cat = x.fields.category || "Sonstiges";
+
+            total += amount;
+
+            // Produkte
+            if(!products[prod]){
+                products[prod] = { count: 0, sum: 0 };
+            }
+
+            products[prod].count += qty;
+            products[prod].sum += amount;
+
+            // Kategorien
+            if(categories[cat] !== undefined){
+                categories[cat] += amount;
+            } else {
+                categories.Sonstiges += amount;
+            }
+        }
+    });
+
+    let sorted = Object.entries(products)
+        .sort((a,b) => b[1].count - a[1].count);
+
+    return { total, products, categories, sorted };
+}
+
+    
     init();
+    
 
 </script>
 </body>
