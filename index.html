@@ -515,10 +515,33 @@ let site=await (await fetch(
 
 siteId=site.id;
 
-let lists=await graph(`/sites/${siteId}/lists`);
-productsId=lists.value.find(l=>l.displayName==="products").id;
-cardsId=lists.value.find(l=>l.displayName==="cards").id;
-transactionsId=lists.value.find(l=>l.displayName==="transactions").id;
+function findList(name){
+    return lists.value.find(l =>
+        l.displayName.toLowerCase() === name.toLowerCase()
+    );
+}
+
+let prodList = findList("products");
+let cardList = findList("cards");
+let transList = findList("transactions");
+
+if(!prodList || !cardList || !transList){
+    console.error("❌ Listen NICHT gefunden:", lists.value);
+    alert("Listen nicht gefunden – siehe Konsole!");
+    return;
+}
+
+productsId = prodList.id;
+cardsId = cardList.id;
+transactionsId = transList.id;
+
+console.log("✅ IDs:", productsId, cardsId, transactionsId);
+
+if(!productsId || !cardsId || !transactionsId){
+    alert("❌ IDs fehlen – init abgebrochen");
+    return;
+}
+
 
 loadProducts();
 loadDashboard();
