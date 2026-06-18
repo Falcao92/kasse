@@ -172,7 +172,6 @@ let pw=prompt("Passwort:");
 if(pw===ADMIN_PASSWORD){
 adminMode=true;
 admin.classList.remove("hidden");
-dashboardSection.classList.remove("hidden");
 cardsSection.classList.remove("hidden");
 loadProducts();
 }
@@ -511,7 +510,6 @@ async function init(){
     await msalInstance.handleRedirectPromise(); // ✅ ganz oben
     await loginM365();                          // ✅ direkt danach
 
-date.value=new Date().toISOString().slice(0,10);
 fromDate.value=date.value;
 toDate.value=date.value;
 
