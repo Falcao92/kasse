@@ -123,7 +123,7 @@ display:none;
 Von: <input type="date" id="fromDate">
 Bis: <input type="date" id="toDate">
 
-<button onclick="loadProductStats()">Auswerten</button>
+<button onclick="loadDashboard()">Auswerten</button
 
 <div id="productStats"></div>
 <canvas id="statsChart"></canvas>
@@ -131,17 +131,7 @@ Bis: <input type="date" id="toDate">
 </div>
 
 <!-- DASHBOARD -->
-<div id="dashboardSection" class="section hidden">
-<h2>📊 Tages Dashboard</h2>
-<input type="date" id="date" onchange="loadDashboard()">
 
-<p>💰 Gesamt: <span id="sum">0 €</span></p>
-<p>🍺 Getränke: <span id="drinkSum">0</span></p>
-<p>🍔 Essen: <span id="foodSum">0</span></p>
-<p>📦 Sonstiges: <span id="otherSum">0</span></p>
-
-<canvas id="chart"></canvas>
-</div>
 
 <!-- KARTEN -->
 <div id="cardsSection" class="section hidden">
@@ -445,10 +435,11 @@ if(c.fields.balance < total){
         Title: "Transaction",
         card_id: cardVal,
         amount: Number(total),
-        quantity: Number(actualQty),   // ✅ jetzt erlaubt
+        quantity: Number(actualQty),  
         type: "charge",
-        product: p.fields.Title,
-        timestamp: new Date().toISOString()
+       product: p.fields.Title,
+category: p.fields.category,  
+timestamp: new Date().toISOString()
     }
 });
 
@@ -702,7 +693,7 @@ statsChart = new Chart(document.getElementById("statsChart"), {
         labels: sorted.map(p => p[0]),
         datasets: [{
             label: "Verkäufe",
-            data: sorted.map(p => p[1].count),
+           data: sorted.map(p => p[1].count),
             backgroundColor: "#4CAF50"
         }]
     }
@@ -758,26 +749,47 @@ statsChart = new Chart(document.getElementById("statsChart"), {
     }
 }
 
-      async function exportCSV(){
-let rows = ["Karte,Produkt,Menge,Kategorie,Typ,Betrag,Zeit"];
+async function exportCSV(){
 
-res.value.forEach(x => {
+    let from = document.getElementById("fromDate").value;
+    let to = document.getElementById("toDate").value;
 
-    let d = x.fields.timestamp?.slice(0,10);
-
-    if(d >= from && d <= to){
-
-        rows.push([
-            x.fields.card_id,
-            x.fields.product || "",
-            x.fields.quantity || 1,
-            x.fields.category || "",
-            x.fields.type,
-            x.fields.amount,
-            x.fields.timestamp
-        ].join(","));
+    if(!from || !to){
+        alert("Bitte Zeitraum wählen");
+        return;
     }
-});
+
+    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+    let rows = ["Karte,Produkt,Menge,Kategorie,Typ,Betrag,Zeit"];
+
+    res.value.forEach(x => {
+
+        let d = x.fields.timestamp?.slice(0,10);
+
+        if(d >= from && d <= to){
+
+            rows.push([
+                x.fields.card_id,
+                x.fields.product || "",
+                x.fields.quantity || 1,
+                x.fields.category || "",
+                x.fields.type,
+                x.fields.amount,
+                x.fields.timestamp
+            ].join(","));
+        }
+    });
+
+    let blob = new Blob([rows.join("\n")], {type:"text/csv"});
+
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `export_${from}_bis_${to}.csv`;
+    a.click();
+
+    showToast("📥 Export erstellt");
+}
     
 
 </script>
