@@ -502,54 +502,54 @@ timestamp: new Date().toISOString()
 
 async function init(){
 
+    await msalInstance.handleRedirectPromise();
+    await loginM365();
 
-    await msalInstance.handleRedirectPromise(); // ✅ ganz oben
-    await loginM365();                          // ✅ direkt danach
+    let t = await token();
 
+    let site = await (await fetch(
+        "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
+        {headers:{Authorization:"Bearer "+t}}
+    )).json();
 
-let t=await token();
-let site=await (await fetch(
-"https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
-{headers:{Authorization:"Bearer "+t}}
-)).json();
+    siteId = site.id;
 
-siteId=site.id;
+    // ✅ ✅ DAS HAT GEFEHLT
+    let lists = await graph(`/sites/${siteId}/lists`);
 
-function findList(name){
-    return lists.value.find(l =>
-        l.displayName.toLowerCase() === name.toLowerCase()
-    );
-}
+    function findList(name){
+        return lists.value.find(l =>
+            l.displayName.toLowerCase() === name.toLowerCase()
+        );
+    }
 
-let prodList = findList("products");
-let cardList = findList("cards");
-let transList = findList("transactions");
+    let prodList = findList("products");
+    let cardList = findList("cards");
+    let transList = findList("transactions");
 
-if(!prodList || !cardList || !transList){
-    console.error("❌ Listen NICHT gefunden:", lists.value);
-    alert("Listen nicht gefunden – siehe Konsole!");
-    return;
-}
+    if(!prodList || !cardList || !transList){
+        console.error("❌ LISTEN NICHT GEFUNDEN:", lists.value);
+        alert("❌ SharePoint Listen nicht gefunden!");
+        return;
+    }
 
-productsId = prodList.id;
-cardsId = cardList.id;
-transactionsId = transList.id;
+    productsId = prodList.id;
+    cardsId = cardList.id;
+    transactionsId = transList.id;
 
-console.log("✅ IDs:", productsId, cardsId, transactionsId);
+    console.log("✅ IDs:", productsId, cardsId, transactionsId);
 
-if(!productsId || !cardsId || !transactionsId){
-    alert("❌ IDs fehlen – init abgebrochen");
-    return;
-}
-
-
-loadProducts();
-loadDashboard();
-loadCards();
+    loadProducts();
+    loadDashboard();
+    loadCards();
 }
 
 // PRODUKTE + ADMIN EDIT
 async function loadProducts(){
+    if(!productsId){
+    console.warn("Produkte noch nicht geladen");
+    return;
+}
 
 let res=await graph(`/sites/${siteId}/lists/${productsId}/items?expand=fields`);
 
