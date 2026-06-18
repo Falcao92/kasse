@@ -328,54 +328,51 @@ async function topup(){
     let cardVal = document.getElementById("card").value;
     let amountVal = parseFloat(document.getElementById("amount").value);
 
-    if(!cardVal || !amountVal){
+    if(!cardVal || isNaN(amountVal)){
         alert("Karte oder Betrag fehlt");
         return;
     }
 
-    // Popup zur Bestätigung
     if(!confirm(`Aufladen bestätigen?\n${amountVal} €`)){
         return;
     }
 
     let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
-    let c = res.value.find(x=>x.fields.Title === cardVal);
+    let c = res.value.find(x => x.fields.Title === cardVal);
 
     if(!c){
-        // neue Karte anlegen
         await graph(`/sites/${siteId}/lists/${cardsId}/items`,"POST",{
             fields:{
-                Title:cardVal,
-                balance:amountVal
+                Title: cardVal,
+                balance: amountVal
             }
         });
     } else {
-        // Guthaben erhöhen
         await graph(`/sites/${siteId}/lists/${cardsId}/items/${c.id}/fields`,
             "PATCH",
             {balance: c.fields.balance + amountVal}
         );
     }
 
-    // Transaktion speichern
-  // ✅ Transaktion speichern (AUFLADUNG)
-await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
-    fields:{
-        Title: "Transaction",
-        card_id: cardVal,
-        amount: total,
-        type: "charge",
-        product: p.fields.Title,
-        timestamp: new Date().toISOString()
-    }
-});
-
+    // ✅ SAUBERE TRANSAKTION
+    await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
+        fields:{
+            Title: "Topup",
+            card_id: cardVal,
+            amount: Number(amountVal),
+            type: "topup",
+            product: "Aufladung",
+            timestamp: new Date().toISOString()
+        }
+    });
 
     showToast("💰 Aufgeladen: " + amountVal + "€");
 
     loadCards();
-    console.log("Topup:", cardVal, amountVal);
+    loadDashboard();
 }
+
+    //Karte zurückgeben
     async function refundCard(){
 
     let cardVal = document.getElementById("card").value;
