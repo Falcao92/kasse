@@ -355,16 +355,16 @@ async function topup(){
     }
 
     // ✅ SAUBERE TRANSAKTION
-    await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
-        fields:{
-            Title: "Topup",
-            card_id: cardVal,
-            amount: Number(amountVal),
-            type: "topup",
-            product: "Aufladung",
-            timestamp: new Date().toISOString()
-        }
-    });
+   await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
+    fields:{
+        Title: "Topup",
+        card_id: cardVal,
+        amount: Number(amountVal),
+        type: "topup",
+        product: "Aufladung",
+        timestamp: new Date().toISOString()
+    }
+});
 
     showToast("💰 Aufgeladen: " + amountVal + "€");
 
@@ -480,19 +480,17 @@ if(c.fields.balance < total){
     );
 
     // Transaktion speichern
-   await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
+  await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
     fields:{
         Title: "Transaction",
-        card_id:cardVal,
-        amount:total,
-        quantity: actualQty,    // ✅ NEU (WICHTIG!)
-        type:"charge",
-        product:p.fields.Title,
-        category:p.fields.category,
-        timestamp:new Date().toISOString()
+        card_id: cardVal,
+        amount: Number(total),
+        quantity: Number(actualQty),   // ✅ jetzt erlaubt
+        type: "charge",
+        product: p.fields.Title,
+        timestamp: new Date().toISOString()
     }
 });
-
 
  showToast(`✅ ${qty}x ${p.fields.Title}`);
 
