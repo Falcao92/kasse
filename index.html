@@ -20,6 +20,17 @@
     }
 }
 
+        input {
+    padding: 14px;
+    font-size: 18px;
+
+    border-radius: 10px;
+    border: 1px solid #ccc;
+
+    width: 100%;
+    max-width: 250px;
+}
+
 body::before {
     content: "";
     position: fixed;
@@ -123,8 +134,22 @@ display:none;
 .productGrid div {
     height: 100%;
 }
+
         
-        .productGrid > div {
+.bigInput {
+    padding: 18px;
+    font-size: 20px;
+    max-width: 300px;
+}
+
+        .topRow {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+    .productGrid > div {
     background: rgba(255,255,255,0.6);
     backdrop-filter: blur(4px);
     border-radius: 12px;
@@ -161,9 +186,13 @@ display:none;
 <div class="section">
 
 </div>
+ 
+<div class="topRow">
     <button onclick="scanNFC()">📡 NFC scannen</button>
-    <input id="card" placeholder="Karte scannen">
-<button onclick="clearCard()">❌</button>
+    <input id="card" class="bigInput" placeholder="Karte scannen">
+    <button onclick="clearCard()">❌</button>
+</div>
+
 
 
 <div class="section">
@@ -180,7 +209,7 @@ display:none;
 </div>
 
 <div class="section">
-<input id="amount" placeholder="Betrag">
+<input id="amount" class="bigInput" placeholder="Betrag">
 <button onclick="topup()">Aufladen</button>
 </div>
 
