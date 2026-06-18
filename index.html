@@ -235,46 +235,6 @@ async function token(){
 
 let siteId, productsId, cardsId, transactionsId;
 
-  async function exportCSV(){
-
-    let from = document.getElementById("fromDate").value;
-    let to = document.getElementById("toDate").value;
-
-    if(!from || !to){
-        alert("Bitte Zeitraum wählen");
-        return;
-    }
-
-    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-    let rows = ["Karte,Produkt,Kategorie,Typ,Betrag,Zeit"];
-
-    res.value.forEach(x => {
-
-        let d = x.fields.timestamp?.slice(0,10);
-
-        if(d >= from && d <= to){
-
-            rows.push([
-                x.fields.card_id,
-                x.fields.product || "",
-                x.fields.category || "",
-                x.fields.type,
-                x.fields.amount,
-                x.fields.timestamp
-            ].join(","));
-        }
-    });
-
-    let blob = new Blob([rows.join("\n")], {type:"text/csv"});
-
-    let a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `export_${from}_bis_${to}.csv`;
-    a.click();
-
-    showToast("📥 Export erstellt");
-}
   
 async function scanNFC(){
 
@@ -652,105 +612,104 @@ let cat=p.fields.category;
 }
 
 // DASHBOARD FIX
-async function loadDashboard(){
 
-let d=date.value;
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+ async function loadDashboard(){
 
-let sum=0,dr=0,fo=0,ot=0;
+let from = fromDate.value;
+let to = toDate.value;
 
-res.value.forEach(x => {
-if(x.fields.timestamp?.slice(0,10)===d && x.fields.type==="charge"){
-
-sum += x.fields.amount;
-
-let qty = Number(x.fields.quantity) || 1;
-
-
-// ✅ addieren
-if(x.fields.category==="Getraenk") dr += qty;
-else if(x.fields.category==="Essen") fo += qty;
-else ot += qty;
-
+if(!from || !to){
+    alert("Bitte Zeitraum wählen");
+    return;
 }
+
+let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+
+let total = 0;
+
+// Produkte
+let products = {};
+
+// Kategorien
+let categories = {
+    Getraenk: 0,
+    Essen: 0,
+    Sonstiges: 0
+};
+
+res.value.forEach(x =>{
+
+    let d = x.fields.timestamp?.slice(0,10);
+
+    if(d >= from && d <= to && x.fields.type === "charge"){
+
+        let qty = Number(x.fields.quantity) || 1;
+        let price = Number(x.fields.amount) || 0;
+        let prod = x.fields.product;
+        let cat = x.fields.category || "Sonstiges";
+
+        total += price;
+
+        // ✅ Produkte
+        if(!products[prod]){
+            products[prod] = { count: 0, sum: 0 };
+        }
+
+        products[prod].count += qty;
+        products[prod].sum += price;
+
+        // ✅ Kategorien Umsatz
+        if(categories[cat] !== undefined){
+            categories[cat] += price;
+        } else {
+            categories.Sonstiges += price;
+        }
+    }
 });
 
-document.getElementById("sum").innerText = sum + " €";
-drinkSum.innerText=dr;
-foodSum.innerText=fo;
-otherSum.innerText=ot;
+// Sortierung nach Umsatz
+let sorted = Object.entries(products)
+    .sort((a,b) => b[1].count - a[1].count);
 
-if(chart) chart.destroy();
+// ✅ HTML Anzeige
+let html = `
+<h3>💰 Gesamt: ${total.toFixed(2)} €</h3>
 
-chart = new Chart(document.getElementById("chart"), {
+<h4>📦 Produkte:</h4>
+`;
+
+sorted.forEach(p =>{
+    html += `
+    ${p[0]} → ${p[1].count}x | ${p[1].sum.toFixed(2)} €<br>
+    `;
+});
+
+html += `
+<h4>📊 Kategorien Umsatz:</h4>
+🍺 Getränke: ${categories.Getraenk.toFixed(2)} €<br>
+🍔 Essen: ${categories.Essen.toFixed(2)} €<br>
+📦 Sonstiges: ${categories.Sonstiges.toFixed(2)} €
+`;
+
+productStats.innerHTML = html;
+
+// ✅ CHART (Produkte)
+if(statsChart) statsChart.destroy();
+
+statsChart = new Chart(document.getElementById("statsChart"), {
     type: "bar",
     data: {
-        labels: ["Getränke","Essen","Sonstiges"],
+        labels: sorted.map(p => p[0]),
         datasets: [{
-            label: "Anzahl Verkäufe",   // ✅ wichtig!
-            data: [dr, fo, ot]
+            label: "Verkäufe",
+            data: sorted.map(p => p[1].count),
+            backgroundColor: "#4CAF50"
         }]
     }
 });
-}
+}   
 
-// ✅ ERWEITERTE AUSWERTUNG
-async function loadProductStats(){
 
-let from=fromDate.value;
-let to=toDate.value;
-
-let res=await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
-
-let products={}, categories={Getraenk:0,Essen:0,Sonstiges:0}, total=0;
-
-res.value.forEach(x=>{
-let d=x.fields.timestamp?.slice(0,10);
-
-if(d>=from && d<=to && x.fields.type==="charge"){
-
-let prod=x.fields.product;
-let amt=x.fields.amount;
-let cat=x.fields.category;
-
-if(!products[prod]) products[prod]={count:0,sum:0};
-
-products[prod].count++;
-products[prod].sum+=amt;
-
-categories[cat]+=amt;
-total+=amt;
-}
-});
-
-let sorted=Object.entries(products).sort((a,b)=>b[1].sum-a[1].sum);
-
-let html=`<h4>💰 Gesamt: ${total.toFixed(2)} €</h4><h4>Produkte:</h4>`;
-
-sorted.forEach(p=>{
-html+=`${p[0]} → ${p[1].count}x | ${p[1].sum.toFixed(2)} €<br>`;
-});
-
-html+=`<h4>Kategorien:</h4>
-🍺 ${categories.Getraenk.toFixed(2)} €<br>
-🍔 ${categories.Essen.toFixed(2)} €<br>
-📦 ${categories.Sonstiges.toFixed(2)} €`;
-
-productStats.innerHTML=html;
-
-// Chart
-if(statsChart) statsChart.destroy();
-
-statsChart=new Chart(document.getElementById("statsChart"),{
-type:"bar",
-data:{
-labels:sorted.map(p=>p[0]),
-datasets:[{data:sorted.map(p=>p[1].sum),backgroundColor:"#7edc8a"}]
-}
-});
-}
-
-init();
 
     async function addProduct(){
 
@@ -798,6 +757,27 @@ init();
         alert("❌ Fehler beim Speichern (Details in Konsole)");
     }
 }
+
+      async function exportCSV(){
+let rows = ["Karte,Produkt,Menge,Kategorie,Typ,Betrag,Zeit"];
+
+res.value.forEach(x => {
+
+    let d = x.fields.timestamp?.slice(0,10);
+
+    if(d >= from && d <= to){
+
+        rows.push([
+            x.fields.card_id,
+            x.fields.product || "",
+            x.fields.quantity || 1,
+            x.fields.category || "",
+            x.fields.type,
+            x.fields.amount,
+            x.fields.timestamp
+        ].join(","));
+    }
+});
     
 
 </script>
