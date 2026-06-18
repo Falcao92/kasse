@@ -174,6 +174,25 @@ display:none;
 .productGrid > div:active {
     transform: scale(0.98);
 }
+        .balanceBox {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+
+    background: rgba(76,175,80,0.9);
+    color: white;
+
+    padding: 10px 16px;
+    border-radius: 12px;
+
+    font-size: 18px;
+    font-weight: bold;
+
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+
+    z-index: 999;
+}
+
         
 .hidden { display:none; }
 </style>
@@ -182,6 +201,9 @@ display:none;
 <body>
 
 <h1>Vereinskasse</h1>
+        <div id="balanceBox" class="balanceBox hidden">
+    💳 0,00 €
+</div>
 
 <div class="section">
 
@@ -375,9 +397,12 @@ async function scanNFC(){
             }
         }
 
-        document.getElementById("card").value = cardId;
+document.getElementById("card").value = cardId;
 
-        showToast("✅ Karte erkannt: " + cardId);
+showToast("✅ Karte erkannt");
+
+showBalance(cardId);   // ✅ NEU
+
 
     } catch (err) {
         alert("❌ Fehler beim Lesen");
@@ -388,7 +413,19 @@ async function scanNFC(){
         alert("❌ NFC Zugriff fehlgeschlagen: " + error);
     }
 }
+async function showBalance(cardId){
 
+    if(!cardId) return;
+
+    let res = await graph(`/sites/${siteId}/lists/${cardsId}/items?expand=fields`);
+    let c = res.value.find(x => x.fields.Title === cardId);
+
+    let balance = c ? c.fields.balance : 0;
+
+    let box = document.getElementById("balanceBox");
+    box.innerText = `💳 ${balance.toFixed(2)} €`;
+    box.classList.remove("hidden");
+}
     
 async function topup(){
 
@@ -437,6 +474,7 @@ async function topup(){
 
     loadCards();
     loadDashboard();
+        showBalance(cardVal);
 }
 
     //Karte zurückgeben
@@ -564,6 +602,7 @@ timestamp: new Date().toISOString()
 
     loadDashboard();
     loadCards();
+        showBalance(cardVal);
 }
 
  async function loadCards(){
