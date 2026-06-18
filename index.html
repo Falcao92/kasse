@@ -361,13 +361,11 @@ async function topup(){
   // ✅ Transaktion speichern (AUFLADUNG)
 await graph(`/sites/${siteId}/lists/${transactionsId}/items`, "POST", {
     fields:{
-        Title: "Topup",
+        Title: "Transaction",
         card_id: cardVal,
-        amount: amountVal,      // ✅ RICHTIG
-        quantity: 1,            // ✅ optional
-        type: "topup",          // ✅ WICHTIG
-        product: "Aufladung",   // ✅ anzeigen im Verlauf
-        category: "Topup",      // ✅ optional
+        amount: total,
+        type: "charge",
+        product: p.fields.Title,
         timestamp: new Date().toISOString()
     }
 });
@@ -449,7 +447,8 @@ body:body?JSON.stringify(body):null
 }
     
 async function charge(p, qty = 1){
-let actualQty = p.fields.Title.includes("Kasten") ? qty * 24 : qty;
+let actualQty = p.fields.Title?.toLowerCase().includes("kasten")
+ ? qty * 24 : qty;
     let cardVal = document.getElementById("card").value;
 
     if(!cardVal){
