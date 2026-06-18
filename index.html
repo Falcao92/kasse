@@ -20,8 +20,7 @@
     }
 }
 
-
-        body::before {
+body::before {
     content: "";
     position: fixed;
 
@@ -34,9 +33,9 @@
 
     background-repeat: no-repeat;
     background-position: center;
-    background-size: 60%;
+    background-size: cover;   /* 🔥 wichtig statt 60% */
 
-    opacity: 0.05;   /* 🔥 HIER STEUERST DU DIE HELLIGKEIT */
+    opacity: 0.04;            /* etwas subtiler */
     z-index: -1;
 }
 
