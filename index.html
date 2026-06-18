@@ -15,10 +15,10 @@ button {
     width: 100%;
     max-width: 350px;
 
-    padding: 25px;
+    padding: 18px;
     margin: 8px;
 
-    font-size: 22px;
+    font-size: 18px;
     font-weight: bold;
 
     border-radius: 15px;
@@ -66,6 +66,13 @@ display:none;
     border-radius: 10px;
 }
     
+.productGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+    
 .hidden { display:none; }
 </style>
 </head>
@@ -83,10 +90,16 @@ display:none;
 
 
 <div class="section">
-<h2>Produkte</h2>
-<h3>🍺 Getränke</h3><div id="drink"></div>
-<h3>🍔 Essen</h3><div id="food"></div>
-<h3>📦 Sonstiges</h3><div id="other"></div>
+
+<h3>🍺 Getränke</h3>
+<div id="drink" class="productGrid"></div>
+
+<h3>🍔 Essen</h3>
+<div id="food" class="productGrid"></div>
+
+<h3>📦 Sonstiges</h3>
+<div id="other" class="productGrid"></div>
+
 </div>
 
 <div class="section">
@@ -563,6 +576,12 @@ drink.innerHTML=""; food.innerHTML=""; other.innerHTML="";
 res.value.forEach(p=>{
 
 let container=document.createElement("div");
+    
+container.style.background = "#fff";
+container.style.borderRadius = "12px";
+container.style.padding = "10px";
+container.style.boxShadow = "0 2px 5px rgba(0,0,0,0.1)";
+
 
 let wrapper = document.createElement("div");
     wrapper.className = "productRow";
@@ -570,6 +589,8 @@ let wrapper = document.createElement("div");
 // Button
 let btn = document.createElement("button");
 btn.innerText = p.fields.Title + " " + p.fields.price + "€";
+    btn.style.padding = "12px";
+btn.style.fontSize = "16px";
 
 // Dropdown für Menge
 let select = document.createElement("select");
@@ -580,7 +601,9 @@ for(let i=1;i<=10;i++){
     opt.innerText = i + "x";
     select.appendChild(opt);
 }
-
+select.style.padding = "10px";
+select.style.fontSize = "16px";
+    
 // Klick → mit Menge
 btn.onclick = () => charge(p, parseInt(select.value));
 
@@ -915,7 +938,17 @@ function processData(res, from, to){
     return { total, products, categories, sorted };
 }
 
-    
+    @media (max-width: 900px) {
+
+    .productGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    button {
+        font-size: 16px;
+        padding: 15px;
+    }
+}
     init();
     
 
