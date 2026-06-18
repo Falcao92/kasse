@@ -146,8 +146,11 @@ Bis: <input type="date" id="toDate">
 <h3>📥 Export</h3>
 
 <button onclick="exportCSV()">CSV Export</button>   
-
+    <button onclick="exportPDF()">PDF Export</button>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
+  
+
     function clearCard(){
     document.getElementById("card").value = "";
 }
@@ -770,6 +773,53 @@ async function exportCSV(){
     showToast("📥 Export fertig (Dashboard = CSV)");
 }
 
+
+    //PDF Export
+    async function exportPDF(){
+
+    let from = fromDate.value;
+    let to = toDate.value;
+
+    let res = await graph(`/sites/${siteId}/lists/${transactionsId}/items?expand=fields`);
+    let data = processData(res, from, to);
+
+    const { jsPDF } = window.jspdf;
+    let doc = new jsPDF();
+
+    let y = 10;
+
+    doc.text("Vereinskasse Bericht", 10, y);
+    y += 10;
+
+    doc.text(`Zeitraum: ${from} bis ${to}`, 10, y);
+    y += 10;
+
+    doc.text("Produkte:", 10, y);
+    y += 10;
+
+    data.sorted.forEach(p=>{
+        doc.text(`${p[0]} - ${p[1].count}x - ${p[1].sum.toFixed(2)}€`, 10, y);
+        y += 7;
+    });
+
+    y += 10;
+
+    doc.text("Kategorien:", 10, y);
+    y += 7;
+
+    doc.text(`Getränke: ${data.categories.Getraenk.toFixed(2)}€`, 10, y);
+    y += 7;
+    doc.text(`Essen: ${data.categories.Essen.toFixed(2)}€`, 10, y);
+    y += 7;
+    doc.text(`Sonstiges: ${data.categories.Sonstiges.toFixed(2)}€`, 10, y);
+    y += 10;
+
+    doc.text(`Gesamt: ${data.total.toFixed(2)}€`, 10, y);
+
+    doc.save(`bericht_${from}_${to}.pdf`);
+}
+
+    //Werte berechnen
 function processData(res, from, to){
 
     let products = {};
