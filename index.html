@@ -510,8 +510,6 @@ async function init(){
     await msalInstance.handleRedirectPromise(); // ✅ ganz oben
     await loginM365();                          // ✅ direkt danach
 
-fromDate.value=date.value;
-toDate.value=date.value;
 
 let t=await token();
 let site=await (await fetch(
