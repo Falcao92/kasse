@@ -110,14 +110,31 @@ async function init(){
 // ===============================
 async function loadProducts(){
 
-    let res = await graph(`/sites/${siteId}/lists/${inventoryId}/items?expand=fields`);
+    let inv = await graph(`/sites/${siteId}/lists/${inventoryId}/items?expand=fields`);
+    let trans = await graph(`/sites/${siteId}/lists/transactions/items?expand=fields`);
 
-    products = res.value || [];
+    products = inv.value || [];
+
+    // ✅ Verkäufe verrechnen
+    trans.value.forEach(t => {
+
+        let f = t.fields;
+
+        if(f.type !== "charge") return;
+
+        let prod = products.find(p =>
+            p.fields.Title.toLowerCase() === (f.product || "").toLowerCase()
+        );
+
+        if(prod){
+            prod.fields.stock =
+                (prod.fields.stock || 0) - (f.quantity || 1);
+        }
+    });
 
     renderProducts();
-    fillLoanDropdown();   // ✅ korrekt hier aufrufen
+    fillLoanDropdown();
 }
-
 
 
 // ✅ SEPARATE FUNKTION (WICHTIG!)
