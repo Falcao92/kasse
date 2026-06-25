@@ -1,156 +1,253 @@
-const siteUrl = _spPageContextInfo.webAbsoluteUrl;
+// ===============================
+// MSAL + GRAPH (wie Kasse)
+// ===============================
+const msalInstance = new msal.PublicClientApplication({
+    auth: {
+        clientId: "844062e7-0d5c-4852-88fc-5e9940f4ed66",
+        authority: "https://login.microsoftonline.com/d05e1986-9d0f-4d67-8b0d-990eb3ae4ecd",
+        redirectUri: window.location.href
+    }
+});
 
+async function token(){
+    let acc = msalInstance.getAllAccounts();
+    if(acc.length === 0){
+        await msalInstance.loginRedirect({
+            scopes:["Sites.ReadWrite.All","User.Read"]
+        });
+        return;
+    }
+
+    let res = await msalInstance.acquireTokenSilent({
+        scopes:["Sites.ReadWrite.All"],
+        account: acc[0]
+    });
+
+    return res.accessToken;
+}
+
+async function graph(url, method="GET", body=null){
+    let t = await token();
+
+    return await fetch("https://graph.microsoft.com/v1.0" + url, {
+        method,
+        headers:{
+            Authorization: "Bearer " + t,
+            "Content-Type":"application/json"
+        },
+        body: body ? JSON.stringify(body) : null
+    }).then(r => r.json());
+}
+
+// ===============================
+// GLOBALS
+// ===============================
+let siteId, inventoryId;
 let products = [];
 
-// ===================== LOAD =====================
-async function getList(name) {
-  const res = await fetch(
-    `${siteUrl}/_api/web/lists/getbytitle('${name}')/items`,
-    { headers: { Accept: "application/json;odata=verbose" } }
-  );
-  const data = await res.json();
-  return data.d.results;
-}
+// ===============================
+// INIT
+// ===============================
+async function init(){
 
-async function loadData() {
-  products = await getList("Products");
-  renderProducts();
-}
+    await msalInstance.handleRedirectPromise();
 
-// ===================== UI =====================
-function renderProducts() {
-  const container = document.getElementById("products");
-  container.innerHTML = "";
+    let t = await token();
 
-  products.forEach(p => {
-    const low = isLowStock(p) ? "low" : "";
+    let site = await (await fetch(
+        "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
+        {headers:{Authorization:"Bearer "+t}}
+    )).json();
 
-    container.innerHTML += `
-      <div class="card ${low}">
-        <h3>${p.Title}</h3>
-        <p>Bestand: ${p.stock}</p>
-        <p>Min: ${p.min_stock}</p>
+    siteId = site.id;
 
-        ${renderRecipe(p)}
+    let lists = await graph(`/sites/${siteId}/lists`);
 
-        <button onclick="changeStock(${p.Id}, 1)">➕</button>
-        <button onclick="changeStock(${p.Id}, -1)">➖</button>
+    let invList = lists.value.find(l =>
+        l.displayName.toLowerCase() === "inventory"
+    );
 
-        ${isLowStock(p) ? "<b>⚠️ Nachbestellen!</b>" : ""}
-      </div>
-    `;
-  });
-}
-
-// ===================== RECEPT UI =====================
-function addRecipeLine() {
-  const div = document.getElementById("recipe");
-
-  div.innerHTML += `
-    <div class="recipe-line">
-      <select class="recipe-product">
-        ${products.map(p => `<option>${p.Title}</option>`).join("")}
-      </select>
-      <input type="number" class="recipe-qty" placeholder="Menge">
-    </div>
-  `;
-}
-
-function getRecipeData() {
-  const items = document.querySelectorAll(".recipe-line");
-
-  let recipe = [];
-
-  items.forEach(row => {
-    let product = row.querySelector(".recipe-product").value;
-    let qty = parseFloat(row.querySelector(".recipe-qty").value);
-
-    if (product && qty) {
-      recipe.push({
-        product: product,
-        quantity: qty
-      });
+    if(!invList){
+        alert("❌ Liste 'inventory' nicht gefunden!");
+        return;
     }
-  });
 
-  return JSON.stringify(recipe);
+    inventoryId = invList.id;
+
+    loadProducts();
 }
 
-// ===================== CREATE PRODUCT =====================
-async function createProduct() {
-  const title = document.getElementById("title").value;
-  const price = parseFloat(document.getElementById("price").value);
-  const stock = parseFloat(document.getElementById("stock").value);
-  const min_stock = parseFloat(document.getElementById("min_stock").value);
-  const type = document.getElementById("type").value;
+// ===============================
+// LOAD PRODUCTS
+// ===============================
+async function loadProducts(){
 
-  let recipe = null;
-  if (type === "composite") {
-    recipe = getRecipeData();
-  }
+    let res = await graph(`/sites/${siteId}/lists/${inventoryId}/items?expand=fields`);
 
-  await fetch(
-    `${siteUrl}/_api/web/lists/getbytitle('Products')/items`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json;odata=verbose",
-        "Content-Type": "application/json;odata=verbose",
-        "X-RequestDigest": document.getElementById("__REQUESTDIGEST").value
-      },
-      body: JSON.stringify({
-        Title: title,
-        price: price,
-        stock: stock,
-        min_stock: min_stock,
-        type: type,
-        recipe: recipe
-      })
-    }
-  );
+    products = res.value;
 
-  alert("Produkt gespeichert!");
-  loadData();
+    renderProducts();
 }
 
-// ===================== STOCK =====================
-async function changeStock(id, change) {
-  let product = products.find(p => p.Id === id);
-  let newStock = (product.stock || 0) + change;
+// ===============================
+// RENDER
+// ===============================
+function renderProducts(){
 
-  await fetch(
-    `${siteUrl}/_api/web/lists/getbytitle('Products')/items(${id})`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json;odata=verbose",
-        "Content-Type": "application/json;odata=verbose",
-        "X-RequestDigest": document.getElementById("__REQUESTDIGEST").value,
-        "IF-MATCH": "*",
-        "X-HTTP-Method": "MERGE"
-      },
-      body: JSON.stringify({ stock: newStock })
-    }
-  );
+    let container = document.getElementById("products");
+    container.innerHTML = "";
 
-  loadData();
-}
+    products.forEach(p => {
 
-// ===================== CHECK =====================
-function isLowStock(p) {
-  if (p.type === "simple") {
-    return p.stock <= p.min_stock;
-  }
+        let f = p.fields;
 
-  if (p.type === "composite" && p.recipe) {
-    const recipe = JSON.parse(p.recipe);
+        let low = isLowStock(p) ? "low" : "";
 
-    return recipe.some(r => {
-      let sub = products.find(x => x.Title === r.product);
-      return sub && sub.stock <= sub.min_stock;
+        container.innerHTML += `
+        <div class="card ${low}">
+            <h3>${f.Title}</h3>
+            <p>Bestand: ${f.stock || 0}</p>
+            <p>Min: ${f.min_stock || 0}</p>
+
+            ${renderRecipe(p)}
+
+            <button onclick="changeStock('${p.id}',1)">➕</button>
+            <button onclick="changeStock('${p.id}',-1)">➖</button>
+
+            ${isLowStock(p) ? "<b>⚠️ Nachbestellen!</b>" : ""}
+        </div>
+        `;
     });
-  }
 }
 
-// ===================== INIT =====================
-loadData();
+// ===============================
+// RECIPE
+// ===============================
+function renderRecipe(p){
+
+    let f = p.fields;
+
+    if(f.type !== "composite" || !f.recipe) return "";
+
+    let recipe = JSON.parse(f.recipe);
+
+    return `
+    <ul>
+        ${recipe.map(r => `<li>${r.quantity}x ${r.product}</li>`).join("")}
+    </ul>
+    `;
+}
+
+// ===============================
+// LOW STOCK
+// ===============================
+function isLowStock(p){
+
+    let f = p.fields;
+
+    if(f.type === "simple"){
+        return (f.stock || 0) <= (f.min_stock || 0);
+    }
+
+    if(f.type === "composite" && f.recipe){
+        let recipe = JSON.parse(f.recipe);
+
+        return recipe.some(r => {
+            let sub = products.find(x => x.fields.Title === r.product);
+            return sub && sub.fields.stock <= sub.fields.min_stock;
+        });
+    }
+}
+
+// ===============================
+// CHANGE STOCK
+// ===============================
+async function changeStock(id, change){
+
+    let p = products.find(x => x.id === id);
+    let f = p.fields;
+
+    let newStock = (f.stock || 0) + change;
+
+    await graph(
+        `/sites/${siteId}/lists/${inventoryId}/items/${id}/fields`,
+        "PATCH",
+        { stock: newStock }
+    );
+
+    loadProducts();
+}
+
+// ===============================
+// CREATE PRODUCT (GUI)
+// ===============================
+async function createProduct(){
+
+    let title = document.getElementById("title").value;
+    let price = parseFloat(document.getElementById("price").value);
+    let stock = parseFloat(document.getElementById("stock").value);
+    let min_stock = parseFloat(document.getElementById("min_stock").value);
+    let type = document.getElementById("type").value;
+
+    let recipe = null;
+    if(type === "composite"){
+        recipe = getRecipeData();
+    }
+
+    await graph(
+        `/sites/${siteId}/lists/${inventoryId}/items`,
+        "POST",
+        {
+            fields:{
+                Title: title,
+                price: price,
+                stock: stock,
+                min_stock: min_stock,
+                type: type,
+                recipe: recipe
+            }
+        }
+    );
+
+    alert("✅ Produkt gespeichert");
+
+    loadProducts();
+}
+
+// ===============================
+// RECIPE BUILDER
+// ===============================
+function addRecipeLine(){
+
+    let div = document.getElementById("recipe");
+
+    div.innerHTML += `
+    <div class="recipe-line">
+        <select class="recipe-product">
+            ${products.map(p => `<option>${p.fields.Title}</option>`).join("")}
+        </select>
+        <input type="number" class="recipe-qty" placeholder="Menge">
+    </div>
+    `;
+}
+
+function getRecipeData(){
+
+    let rows = document.querySelectorAll(".recipe-line");
+
+    let recipe = [];
+
+    rows.forEach(r => {
+        let prod = r.querySelector(".recipe-product").value;
+        let qty = parseFloat(r.querySelector(".recipe-qty").value);
+
+        if(prod && qty){
+            recipe.push({ product: prod, quantity: qty });
+        }
+    });
+
+    return JSON.stringify(recipe);
+}
+
+// ===============================
+init();
