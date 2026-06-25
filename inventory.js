@@ -420,45 +420,6 @@ function getRecipeData(){
     return JSON.stringify(recipe);
 }
 
-async function lendItem(productId){
-
-    let p = products.find(x => x.id === productId);
-    let name = prompt("Wer leiht?");
-
-    if(!name) return;
-
-    let qty = Number(prompt("Menge:")) || 1;
-
-    if(qty <= 0) return;
-
-    let stock = p.fields.stock || 0;
-
-    if(stock < qty){
-        alert("Nicht genug Bestand!");
-        return;
-    }
-
-    // Bestand reduzieren
-    await changeStock(productId, -qty);
-
-    // Eintrag speichern
-    await graph(
-        `/sites/${siteId}/lists/${loansId}/items`,
-        "POST",
-        {
-            fields:{
-                Title: "Loan",
-                product: p.fields.Title,
-                person: name,
-                quantity: qty,
-                action: "out",
-                timestamp: new Date().toISOString()
-            }
-        }
-    );
-
-    alert("✅ Verliehen");
-}
 
 async function returnItem(productId){
 
