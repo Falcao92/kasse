@@ -9,6 +9,8 @@ const msalInstance = new msal.PublicClientApplication({
     }
 });
 
+
+
 async function token(){
     let acc = msalInstance.getAllAccounts();
 
@@ -48,6 +50,8 @@ async function graph(url, method="GET", body=null){
 // ===============================
 let siteId, inventoryId;
 let products = [];
+//Verleihsystem
+let loansId;
 
 // ===============================
 // INIT
@@ -55,7 +59,17 @@ let products = [];
 async function init(){
 
     await msalInstance.handleRedirectPromise();
+let loanList = lists.value.find(l =>
+    l.displayName.toLowerCase() === "loans"
+);
 
+if(!loanList){
+    alert("❌ Liste 'Loans' fehlt!");
+    return;
+}
+
+loansId = loanList.id;
+    
     let t = await token();
 
     let site = await (await fetch(
@@ -108,7 +122,7 @@ function renderProducts(){
         "Getraenk": [],
         "Essen": [],
         "Verbrauch": [],
-         "Inventar": []
+        "Inventar": []
     };
 
     products.forEach(p => {
@@ -155,14 +169,32 @@ function renderProducts(){
             let f = p.fields;
             let low = isLowStock(p) ? "low" : "";
 
+            // ✅ Unterschied Asset vs normal
+            let actions = "";
+
+            if(f.type === "asset"){
+                actions = `
+                <button onclick="lendItem('${p.id}')">📤</button>
+                <button onclick="returnItem('${p.id}')">📥</button>
+                `;
+            } else {
+                actions = `
+                <button onclick="changeStock('${p.id}',1)">➕</button>
+                <button onclick="changeStock('${p.id}',-1)">➖</button>
+                `;
+            }
+
             grid.innerHTML += `
             <div class="productItem ${low}">
                 <b>${f.Title}</b><br>
-                Bestand: ${f.stock || 0}<br>
-                Min: ${f.minstock || 0}<br>
 
-                <button onclick="changeStock('${p.id}',1)">➕</button>
-                <button onclick="changeStock('${p.id}',-1)">➖</button>
+                Bestand: ${f.stock || 0}<br>
+
+                ${f.type !== "asset"
+                    ? `Min: ${f.minstock || 0}<br>`
+                    : ""}
+
+                ${actions}
             </div>
             `;
         });
@@ -353,6 +385,79 @@ function getRecipeData(){
     });
 
     return JSON.stringify(recipe);
+}
+
+async function lendItem(productId){
+
+    let p = products.find(x => x.id === productId);
+    let name = prompt("Wer leiht?");
+
+    if(!name) return;
+
+    let qty = Number(prompt("Menge:")) || 1;
+
+    if(qty <= 0) return;
+
+    let stock = p.fields.stock || 0;
+
+    if(stock < qty){
+        alert("Nicht genug Bestand!");
+        return;
+    }
+
+    // Bestand reduzieren
+    await changeStock(productId, -qty);
+
+    // Eintrag speichern
+    await graph(
+        `/sites/${siteId}/lists/${loansId}/items`,
+        "POST",
+        {
+            fields:{
+                Title: "Loan",
+                product: p.fields.Title,
+                person: name,
+                quantity: qty,
+                action: "out",
+                timestamp: new Date().toISOString()
+            }
+        }
+    );
+
+    alert("✅ Verliehen");
+}
+
+async function returnItem(productId){
+
+    let p = products.find(x => x.id === productId);
+
+    let name = prompt("Wer gibt zurück?");
+    if(!name) return;
+
+    let qty = Number(prompt("Menge:")) || 1;
+
+    if(qty <= 0) return;
+
+    // Bestand erhöhen
+    await changeStock(productId, qty);
+
+    // Log
+    await graph(
+        `/sites/${siteId}/lists/${loansId}/items`,
+        "POST",
+        {
+            fields:{
+                Title: "Return",
+                product: p.fields.Title,
+                person: name,
+                quantity: qty,
+                action: "back",
+                timestamp: new Date().toISOString()
+            }
+        }
+    );
+
+    alert("✅ Zurückgegeben");
 }
 
 // ===============================
