@@ -107,7 +107,8 @@ function renderProducts(){
     let categories = {
         "Getraenk": [],
         "Essen": [],
-        "Verbrauch": []
+        "Verbrauch": [],
+         "Inventar": []
     };
 
     products.forEach(p => {
@@ -174,7 +175,7 @@ function getCategoryLabel(cat){
     if(cat === "Getraenk") return "🍺 Getränke";
     if(cat === "Essen") return "🍔 Essen";
     if(cat === "Verbrauch") return "📦 Verbrauch";
-
+ if(cat === "Inventar") return "🪑 Inventar";
     return cat;
 }
 
@@ -259,6 +260,11 @@ async function createProduct(){
 let category = document.getElementById("category").value;
 
         let recipe = "";
+
+        if(type === "asset"){
+    category = "Inventar";
+}
+
 if(type === "asset"){
     minstock = 0;
 }
