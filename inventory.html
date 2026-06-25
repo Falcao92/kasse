@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Inventur GUI</title>
+
+<style>
+body { font-family: Arial; background: #f5f5f5; }
+
+.card {
+  background: white;
+  padding: 15px;
+  margin: 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.low { background: #ffd6d6; }
+
+input, select, button {
+  margin: 5px;
+  padding: 6px;
+}
+
+.recipe-line {
+  display: flex;
+  gap: 5px;
+}
+</style>
+
+</head>
+<body>
+
+<h1>📦 Inventursystem</h1>
+
+<!-- ✅ PRODUKT ANLEGEN -->
+<div class="card">
+<h2>Neues Produkt</h2>
+
+<input id="title" placeholder="Produktname">
+<input id="price" type="number" placeholder="Preis">
+<input id="stock" type="number" placeholder="Bestand">
+<input id="min_stock" type="number" placeholder="Mindestbestand">
+
+<select id="type">
+  <option value="simple">Einfach</option>
+  <option value="composite">Rezept</option>
+</select>
+
+<h3>Rezept</h3>
+<div id="recipe"></div>
+<button onclick="addRecipeLine()">+ Zutat</button>
+
+<br><br>
+<button onclick="createProduct()">✅ Speichern</button>
+
+</div>
+
+<!-- ✅ PRODUKT LISTE -->
+<div id="products"></div>
+
+inventory.js
+
+</body>
+</html>
