@@ -59,19 +59,10 @@ let loansId;
 async function init(){
 
     await msalInstance.handleRedirectPromise();
-let loanList = lists.value.find(l =>
-    l.displayName.toLowerCase() === "loans"
-);
 
-if(!loanList){
-    alert("❌ Liste 'Loans' fehlt!");
-    return;
-}
-
-loansId = loanList.id;
-    
     let t = await token();
 
+    // ✅ Site holen
     let site = await (await fetch(
         "https://graph.microsoft.com/v1.0/sites/tsc1907.sharepoint.com:/sites/Kasse",
         {headers:{Authorization:"Bearer "+t}}
@@ -79,8 +70,10 @@ loansId = loanList.id;
 
     siteId = site.id;
 
+    // ✅ Listen laden
     let lists = await graph(`/sites/${siteId}/lists`);
 
+    // ✅ Inventory
     let invList = lists.value.find(l =>
         l.displayName.toLowerCase() === "inventory"
     );
@@ -92,8 +85,22 @@ loansId = loanList.id;
 
     inventoryId = invList.id;
 
+    // ✅ Loans (JETZT korrekt!)
+    let loanList = lists.value.find(l =>
+        l.displayName.toLowerCase() === "loans"
+    );
+
+    if(!loanList){
+        alert("❌ Liste 'Loans' fehlt!");
+        return;
+    }
+
+    loansId = loanList.id;
+
+    // ✅ Daten laden
     loadProducts();
 }
+
 
 // ===============================
 // LOAD PRODUCTS
