@@ -26,7 +26,10 @@ input, select, button {
   display: flex;
   gap: 5px;
 }
-</style><script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+</style>
+
+<!-- ✅ MSAL -->
+<script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 
 </head>
 
@@ -34,14 +37,15 @@ input, select, button {
 
 <h1>📦 Inventursystem</h1>
 
-<!-- ✅ PRODUKT ANLEGEN -->
 <div class="card">
 <h2>Neues Produkt</h2>
 
 <input id="title" placeholder="Produktname">
 <input id="price" type="number" placeholder="Preis">
 <input id="stock" type="number" placeholder="Bestand">
-<input id="min_stock" type="number" placeholder="Mindestbestand">
+
+<!-- ✅ FIX: ID angepasst -->
+<input id="minstock" type="number" placeholder="Mindestbestand">
 
 <select id="type">
   <option value="simple">Einfach</option>
@@ -57,11 +61,10 @@ input, select, button {
 
 </div>
 
-<!-- ✅ PRODUKT LISTE -->
 <div id="products"></div>
 
-<!-- ✅ WICHTIG -->
-
+<!-- ✅ Script ganz unten -->
 <script src="inventory.js"></script>
+
 </body>
 </html>
