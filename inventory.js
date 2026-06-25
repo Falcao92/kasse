@@ -209,6 +209,10 @@ function isLowStock(p){
     if(f.type === "simple"){
         return (f.stock || 0) <= (f.minstock || 0);
     }
+    
+if(f.type === "asset"){
+    return false;
+}
 
     if(f.type === "composite" && f.recipe){
 
@@ -255,7 +259,9 @@ async function createProduct(){
 let category = document.getElementById("category").value;
 
         let recipe = "";
-
+if(type === "asset"){
+    minstock = 0;
+}
         if(type === "composite"){
             let r = getRecipeData();
             if(r === "[]"){
