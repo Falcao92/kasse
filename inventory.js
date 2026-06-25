@@ -107,7 +107,7 @@ function renderProducts(){
         <div class="card ${low}">
             <h3>${f.Title}</h3>
             <p>Bestand: ${f.stock || 0}</p>
-            <p>Min: ${f.min_stock || 0}</p>
+            <p>Min: ${f.minstock || 0}</p>
 
             ${renderRecipe(p)}
 
@@ -146,7 +146,7 @@ function isLowStock(p){
     let f = p.fields;
 
     if(f.type === "simple"){
-        return (f.stock || 0) <= (f.min_stock || 0);
+        return (f.stock || 0) <= (f.minstock || 0);
     }
 
     if(f.type === "composite" && f.recipe){
@@ -154,7 +154,7 @@ function isLowStock(p){
 
         return recipe.some(r => {
             let sub = products.find(x => x.fields.Title === r.product);
-            return sub && sub.fields.stock <= sub.fields.min_stock;
+            return sub && sub.fields.stock <= sub.fields.minstock;
         });
     }
 }
@@ -186,7 +186,7 @@ async function createProduct(){
     let title = document.getElementById("title").value;
     let price = parseFloat(document.getElementById("price").value);
     let stock = parseFloat(document.getElementById("stock").value);
-    let min_stock = parseFloat(document.getElementById("min_stock").value);
+    let minstock = parseFloat(document.getElementById("minstock").value);
     let type = document.getElementById("type").value;
 
     let recipe = null;
@@ -202,7 +202,7 @@ async function createProduct(){
                 Title: title,
                 price: price,
                 stock: stock,
-                min_stock: min_stock,
+                minstock: minstock,
                 type: type,
                 recipe: recipe
             }
@@ -217,7 +217,13 @@ async function createProduct(){
 // ===============================
 // RECIPE BUILDER
 // ===============================
-function addRecipeLine(){
+
+   function addRecipeLine(){
+
+    if(products.length === 0){
+        alert("Produkte noch nicht geladen");
+        return;
+    }
 
     let div = document.getElementById("recipe");
 
