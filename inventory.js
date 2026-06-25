@@ -516,7 +516,6 @@ async function showOpenLoans(){
     data.forEach(x => {
 
         let f = x.fields;
-
         let key = f.person + "|" + f.product;
 
         if(!summary[key]){
@@ -546,7 +545,11 @@ async function showOpenLoans(){
             <div class="card">
                 <b>${x.product}</b><br>
                 👤 ${x.person}<br>
-                📦 Offen: ${x.qty}
+                📦 Offen: ${x.qty}<br><br>
+
+                <button onclick="quickReturn('${x.product}','${x.person}',${x.qty})">
+                    📥 Zurück
+                </button>
             </div>
             `;
         });
@@ -556,6 +559,96 @@ async function showOpenLoans(){
     }
 
     document.getElementById("products").innerHTML = html;
+}
+
+async function quickReturn(productName, person, maxQty){
+
+    let qty = Number(prompt(`Wie viele zurück? (max ${maxQty})`));
+
+    if(!qty || qty <= 0 || qty > maxQty){
+        alert("Ungültige Menge!");
+        return;
+    }
+
+    let p = products.find(x => x.fields.Title === productName);
+
+    if(!p){
+        alert("Produkt nicht gefunden");
+        return;
+    }
+
+    // Bestand erhöhen
+    await changeStock(p.id, qty);
+
+    // Log speichern
+    await graph(
+        `/sites/${siteId}/lists/${loansId}/items`,
+        "POST",
+        {
+            fields:{
+                Title: "Return",
+                product: productName,
+                person: person,
+                quantity: qty,
+                action: "back",
+                timestamp: new Date().toISOString()
+            }
+        }
+    );
+
+    alert("✅ Rückgabe gebucht");
+
+    showOpenLoans();
+}
+
+async function lendItem(productId){
+
+    let p = products.find(x => x.id === productId);
+
+    let name = prompt("Wer leiht?");
+    if(!name) return;
+
+    let qty = Number(prompt("Menge:")) || 1;
+
+    if(qty <= 0) return;
+
+    let start = prompt("Startdatum (YYYY-MM-DD) oder leer für heute:");
+    let end = prompt("Enddatum (YYYY-MM-DD) optional:");
+
+    if(!start) start = new Date().toISOString().slice(0,10);
+
+    // Bestand nur prüfen wenn HEUTE
+    let today = new Date().toISOString().slice(0,10);
+
+    if(start === today){
+        let stock = p.fields.stock || 0;
+
+        if(stock < qty){
+            alert("Nicht genug Bestand!");
+            return;
+        }
+
+        await changeStock(productId, -qty);
+    }
+
+    await graph(
+        `/sites/${siteId}/lists/${loansId}/items`,
+        "POST",
+        {
+            fields:{
+                Title: "Loan",
+                product: p.fields.Title,
+                person: name,
+                quantity: qty,
+                action: "out",
+                timestamp: new Date().toISOString(),
+                startDate: start,
+                endDate: end || ""
+            }
+        }
+    );
+
+    alert("✅ Vorgang gespeichert");
 }
 
 // ===============================
