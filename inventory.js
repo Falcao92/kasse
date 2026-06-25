@@ -191,41 +191,54 @@ async function createProduct(){
     try {
 
         let title = document.getElementById("title").value.trim();
-
-        let price = parseFloat(document.getElementById("price").value) || 0;
-        let stock = parseFloat(document.getElementById("stock").value) || 0;
-        let minstock = parseFloat(document.getElementById("minstock").value) || 0;
-
+        let price = Number(document.getElementById("price").value) || 0;
+        let stock = Number(document.getElementById("stock").value) || 0;
+        let minstock = Number(document.getElementById("minstock").value) || 0;
         let type = document.getElementById("type").value;
 
         let recipe = "";
 
         if(type === "composite"){
             let r = getRecipeData();
-            recipe = (r !== "[]") ? r : "";
+            if(r === "[]"){
+                alert("Rezept fehlt!");
+                return;
+            }
+            recipe = r;
         }
 
-        await graph(
+        let body = {
+            fields: {
+                Title: title,
+                price: price,
+                stock: stock,
+                minstock: minstock,
+                type: type,
+                recipe: recipe
+            }
+        };
+
+        console.log("SEND BODY:", JSON.stringify(body, null, 2));
+
+        let res = await graph(
             `/sites/${siteId}/lists/${inventoryId}/items`,
             "POST",
-            {
-                fields:{
-                    Title: title,
-                    price: price,
-                    stock: stock,
-                    minstock: minstock,
-                    type: type,
-                    recipe: recipe
-                }
-            }
+            body
         );
 
-        alert("✅ Produkt gespeichert");
+        console.log("RESPONSE:", res);
+
+        if(res.error){
+            alert("❌ SharePoint Fehler: " + res.error.message);
+            return;
+        }
+
+        alert("✅ OK gespeichert");
 
         loadProducts();
 
     } catch(e){
-        console.error("FEHLER:", e);
+        console.error("HARTE ERROR:", e);
         alert("❌ Fehler – siehe Konsole");
     }
 }
