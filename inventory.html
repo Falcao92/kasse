@@ -80,7 +80,6 @@ input, select, button {
 <input id="title" placeholder="Produktname">
 <input id="price" type="number" placeholder="Preis">
 <input id="stock" type="number" placeholder="Bestand">
-
 <input id="minstock" type="number" placeholder="Mindestbestand">
 
 <select id="type">
@@ -103,6 +102,9 @@ input, select, button {
 <br><br>
 <button onclick="createProduct()">✅ Speichern</button>
 
+</div>
+
+<!-- ✅ VERLEIH / RESERVIERUNG -->
 <div class="card">
 <h3>📦 Verleih / Reservierung</h3>
 
@@ -124,9 +126,10 @@ input, select, button {
 <button onclick="showLoans()">📋 Verlauf</button>
 <button onclick="showOpenLoans()">📦 Offen</button>
 <button onclick="showReservations()">📅 Reservierungen</button>
-<button onclick="renderProducts()">🔙 Inventar</button>
+<button onclick="loadProducts()">📦 Inventar</button>
 
 </div>
+
 <!-- ✅ FILTER -->
 <div class="card">
 
@@ -152,43 +155,41 @@ function toggleCategory(id){
     el.style.display = el.style.display === "block" ? "none" : "block";
 }
 
-// ✅ Typ-Steuerung (wichtig!)
+// ✅ Typ-Steuerung
 document.addEventListener("DOMContentLoaded", function(){
 
     let typeSelect = document.getElementById("type");
     let minInput = document.getElementById("minstock");
-let priceInput = document.getElementById("price");
+    let priceInput = document.getElementById("price");
+
     let recipe = document.getElementById("recipe");
     let recipeBtn = document.getElementById("recipeBtn");
     let recipeTitle = document.getElementById("recipeTitle");
 
-   function updateUI(){
+    function updateUI(){
 
-    // ✅ Asset = kein Mindestbestand + kein Preis
-    if(typeSelect.value === "asset"){
-        minInput.style.display = "none";
-        priceInput.style.display = "none";
-    } else {
-        minInput.style.display = "inline-block";
-        priceInput.style.display = "inline-block";
-    }
+        // ✅ Asset → kein Preis + kein Mindestbestand
+        if(typeSelect.value === "asset"){
+            minInput.style.display = "none";
+            priceInput.style.display = "none";
+        } else {
+            minInput.style.display = "inline-block";
+            priceInput.style.display = "inline-block";
+        }
 
-    // ✅ Rezept nur für composite
-    if(typeSelect.value === "composite"){
-        recipe.style.display = "block";
-        recipeBtn.style.display = "inline-block";
-        recipeTitle.style.display = "block";
-    } else {
-        recipe.style.display = "none";
-        recipeBtn.style.display = "none";
-        recipeTitle.style.display = "none";
+        // ✅ Rezept nur bei composite
+        if(typeSelect.value === "composite"){
+            recipe.style.display = "block";
+            recipeBtn.style.display = "inline-block";
+            recipeTitle.style.display = "block";
+        } else {
+            recipe.style.display = "none";
+            recipeBtn.style.display = "none";
+            recipeTitle.style.display = "none";
+        }
     }
-}
 
     typeSelect.addEventListener("change", updateUI);
-
-
-  
 
     updateUI();
 });
