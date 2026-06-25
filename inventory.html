@@ -92,7 +92,7 @@ input, select, button {
 <select id="category">
   <option value="Getraenk">Getränke</option>
   <option value="Essen">Essen</option>
-  <option value="Verbrauch">Verbrauch</option>,
+  <option value="Verbrauch">Verbrauch</option>
   <option value="Inventar">Inventar</option>
 </select>
 
@@ -106,6 +106,7 @@ input, select, button {
 </div>
   <br><br>
 <button onclick="showLoans()">📋 Verleih ansehen</button>
+  <button onclick="renderProducts()">🔙 Inventar</button>
 <!-- ✅ FILTER -->
 <div class="card">
 
@@ -163,6 +164,9 @@ document.addEventListener("DOMContentLoaded", function(){
     }
 
     typeSelect.addEventListener("change", updateUI);
+
+
+  
 
     updateUI();
 });
