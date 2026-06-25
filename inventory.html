@@ -70,6 +70,7 @@ input, select, button {
 
 </style>
 
+<!-- ✅ MSAL -->
 <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 
 </head>
@@ -85,14 +86,16 @@ input, select, button {
 <input id="title" placeholder="Produktname">
 <input id="price" type="number" placeholder="Preis">
 <input id="stock" type="number" placeholder="Bestand">
+
+<!-- ✅ WIRD DYNAMISCH AUSGEBLENDET -->
 <input id="minstock" type="number" placeholder="Mindestbestand">
 
 <select id="type">
   <option value="simple">Einfach</option>
   <option value="composite">Rezept</option>
+  <option value="asset">Inventar (kein Min)</option>
 </select>
 
-<!-- ✅ NEU: Kategorie -->
 <select id="category">
   <option value="Getraenk">Getränke</option>
   <option value="Essen">Essen</option>
@@ -108,7 +111,6 @@ input, select, button {
 
 </div>
 
-  
 <!-- ✅ FILTER + SUCHE -->
 <div class="card">
 
@@ -133,6 +135,34 @@ function toggleCategory(id){
     let el = document.getElementById(id);
     el.style.display = el.style.display === "block" ? "none" : "block";
 }
+
+// ✅ NEU: Typ-Logik (Asset ohne Mindestbestand)
+document.addEventListener("DOMContentLoaded", function(){
+
+    let typeSelect = document.getElementById("type");
+    let minInput = document.getElementById("minstock");
+
+    typeSelect.addEventListener("change", function(){
+
+        if(this.value === "asset"){
+            minInput.style.display = "none";
+        } else {
+            minInput.style.display = "inline-block";
+        }
+
+        // Rezept nur für composite sinnvoll
+        let recipeSection = document.getElementById("recipe").parentElement;
+
+        if(this.value === "composite"){
+            recipeSection.style.display = "block";
+        } else {
+            recipeSection.style.display = "none";
+        }
+    });
+
+    // Initialzustand setzen
+    typeSelect.dispatchEvent(new Event("change"));
+});
 </script>
 
 </body>
