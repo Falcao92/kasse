@@ -103,6 +103,27 @@ input, select, button {
 <br><br>
 <button onclick="createProduct()">✅ Speichern</button>
 
+<div class="card">
+<h3>📅 Verleih / Reservierung</h3>
+
+<select id="loanProduct"></select>
+
+<input id="loanPerson" placeholder="Name">
+
+<input id="loanQty" type="number" placeholder="Menge">
+
+<label>Von:</label>
+<input id="loanStart" type="date">
+
+<label>Bis:</label>
+<input id="loanEnd" type="date">
+
+<br>
+<button onclick="lendFromUI()">📤 Ausleihen / Reservieren</button>
+
+</div>
+
+  
 </div>
   <br><br>
 <button onclick="showLoans()">📋 Verleih ansehen</button>
