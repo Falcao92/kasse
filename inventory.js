@@ -304,6 +304,12 @@ let category = document.getElementById("category").value;
     category = "Inventar";
 }
 
+// ✅ Wenn Kategorie Inventar → automatisch asset
+if(category === "Inventar"){
+    type = "asset";
+}
+
+        
 if(type === "asset"){
     minstock = 0;
 }
