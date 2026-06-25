@@ -1,5 +1,5 @@
 // ===============================
-// MSAL + GRAPH (wie Kasse)
+// MSAL + GRAPH
 // ===============================
 const msalInstance = new msal.PublicClientApplication({
     auth: {
@@ -11,6 +11,7 @@ const msalInstance = new msal.PublicClientApplication({
 
 async function token(){
     let acc = msalInstance.getAllAccounts();
+
     if(acc.length === 0){
         await msalInstance.loginRedirect({
             scopes:["Sites.ReadWrite.All","User.Read"]
@@ -36,7 +37,10 @@ async function graph(url, method="GET", body=null){
             "Content-Type":"application/json"
         },
         body: body ? JSON.stringify(body) : null
-    }).then(r => r.json());
+    }).then(async r => {
+        const text = await r.text();
+        try { return JSON.parse(text); } catch { return text; }
+    });
 }
 
 // ===============================
@@ -84,7 +88,7 @@ async function loadProducts(){
 
     let res = await graph(`/sites/${siteId}/lists/${inventoryId}/items?expand=fields`);
 
-    products = res.value;
+    products = res.value || [];
 
     renderProducts();
 }
@@ -121,7 +125,7 @@ function renderProducts(){
 }
 
 // ===============================
-// RECIPE
+// RECIPE DISPLAY
 // ===============================
 function renderRecipe(p){
 
@@ -139,7 +143,7 @@ function renderRecipe(p){
 }
 
 // ===============================
-// LOW STOCK
+// LOW STOCK CHECK
 // ===============================
 function isLowStock(p){
 
@@ -150,11 +154,12 @@ function isLowStock(p){
     }
 
     if(f.type === "composite" && f.recipe){
+
         let recipe = JSON.parse(f.recipe);
 
         return recipe.some(r => {
             let sub = products.find(x => x.fields.Title === r.product);
-            return sub && sub.fields.stock <= sub.fields.minstock;
+            return sub && (sub.fields.stock <= sub.fields.minstock);
         });
     }
 }
@@ -179,46 +184,54 @@ async function changeStock(id, change){
 }
 
 // ===============================
-// CREATE PRODUCT (GUI)
+// CREATE PRODUCT
 // ===============================
 async function createProduct(){
 
-    let title = document.getElementById("title").value;
-    let price = parseFloat(document.getElementById("price").value);
-    let stock = parseFloat(document.getElementById("stock").value);
-    let minstock = parseFloat(document.getElementById("minstock").value);
-    let type = document.getElementById("type").value;
+    try {
 
-    let recipe = null;
-    if(type === "composite"){
-        recipe = getRecipeData();
-    }
+        let title = document.getElementById("title").value;
+        let price = parseFloat(document.getElementById("price").value) || 0;
+        let stock = parseFloat(document.getElementById("stock").value) || 0;
+        let minstock = parseFloat(document.getElementById("minstock").value) || 0;
+        let type = document.getElementById("type").value;
 
-    await graph(
-        `/sites/${siteId}/lists/${inventoryId}/items`,
-        "POST",
-        {
-            fields:{
-                Title: title,
-                price: price,
-                stock: stock,
-                minstock: minstock,
-                type: type,
-                recipe: recipe
-            }
+        let recipe = null;
+
+        if(type === "composite"){
+            let r = getRecipeData();
+            recipe = (r !== "[]") ? r : null;
         }
-    );
 
-    alert("✅ Produkt gespeichert");
+        await graph(
+            `/sites/${siteId}/lists/${inventoryId}/items`,
+            "POST",
+            {
+                fields:{
+                    Title: title,
+                    price: price,
+                    stock: stock,
+                    minstock: minstock,
+                    type: type,
+                    recipe: recipe
+                }
+            }
+        );
 
-    loadProducts();
+        alert("✅ Produkt gespeichert");
+
+        loadProducts();
+
+    } catch(e){
+        console.error(e);
+        alert("❌ Fehler – siehe Konsole");
+    }
 }
 
 // ===============================
 // RECIPE BUILDER
 // ===============================
-
-   function addRecipeLine(){
+function addRecipeLine(){
 
     if(products.length === 0){
         alert("Produkte noch nicht geladen");
