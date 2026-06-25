@@ -179,42 +179,7 @@ function getCategoryLabel(cat){
 }
 
 
-    // Rendering
-    Object.keys(categories).forEach(cat => {
 
-        let id = "cat_" + cat;
-
-        container.innerHTML += `
-        <div class="category">
-            <div class="categoryHeader" onclick="toggleCategory('${id}')">
-                ${cat}
-            </div>
-            <div id="${id}" class="categoryContent">
-                <div class="productGrid" id="${id}_grid"></div>
-            </div>
-        </div>
-        `;
-
-        let grid = document.getElementById(id + "_grid");
-
-        categories[cat].forEach(p => {
-
-            let f = p.fields;
-            let low = isLowStock(p) ? "low" : "";
-
-            grid.innerHTML += `
-            <div class="productItem ${low}">
-                <b>${f.Title}</b><br>
-                Bestand: ${f.stock || 0}<br>
-                Min: ${f.minstock || 0}<br>
-
-                <button onclick="changeStock('${p.id}',1)">➕</button>
-                <button onclick="changeStock('${p.id}',-1)">➖</button>
-            </div>
-            `;
-        });
-    });
-}
 
 // ===============================
 // RECIPE DISPLAY
