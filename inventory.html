@@ -108,6 +108,20 @@ input, select, button {
 
 </div>
 
+  
+<!-- ✅ FILTER + SUCHE -->
+<div class="card">
+
+<input id="search" placeholder="🔍 Produkt suchen..." oninput="renderProducts()">
+
+<select id="filter" onchange="renderProducts()">
+  <option value="all">Alle</option>
+  <option value="low">Nur Mindestbestand</option>
+  <option value="ok">Nur ausreichend</option>
+</select>
+
+</div>
+
 <!-- ✅ PRODUKTE -->
 <div id="products"></div>
 
