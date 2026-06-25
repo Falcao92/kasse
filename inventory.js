@@ -101,23 +101,83 @@ function renderProducts(){
     let container = document.getElementById("products");
     container.innerHTML = "";
 
+    let search = document.getElementById("search")?.value.toLowerCase() || "";
+    let filter = document.getElementById("filter")?.value || "all";
+
     let categories = {
         "Getraenk": [],
         "Essen": [],
         "Verbrauch": []
     };
 
-    // Produkte sortieren
     products.forEach(p => {
+
         let f = p.fields;
+
+        let name = (f.Title || "").toLowerCase();
         let cat = f.category || "Verbrauch";
 
-        if(!categories[cat]){
-            categories[cat] = [];
-        }
+        let low = isLowStock(p);
 
+        // ✅ SUCHFILTER
+        if(search && !name.includes(search)) return;
+
+        // ✅ STATUS FILTER
+        if(filter === "low" && !low) return;
+        if(filter === "ok" && low) return;
+
+        if(!categories[cat]) categories[cat] = [];
         categories[cat].push(p);
     });
+
+    Object.keys(categories).forEach(cat => {
+
+        if(categories[cat].length === 0) return;
+
+        let id = "cat_" + cat;
+
+        container.innerHTML += `
+        <div class="category">
+            <div class="categoryHeader" onclick="toggleCategory('${id}')">
+                ${getCategoryLabel(cat)} (${categories[cat].length})
+            </div>
+            <div id="${id}" class="categoryContent">
+                <div class="productGrid" id="${id}_grid"></div>
+            </div>
+        </div>
+        `;
+
+        let grid = document.getElementById(id + "_grid");
+
+        categories[cat].forEach(p => {
+
+            let f = p.fields;
+            let low = isLowStock(p) ? "low" : "";
+
+            grid.innerHTML += `
+            <div class="productItem ${low}">
+                <b>${f.Title}</b><br>
+                Bestand: ${f.stock || 0}<br>
+                Min: ${f.minstock || 0}<br>
+
+                <button onclick="changeStock('${p.id}',1)">➕</button>
+                <button onclick="changeStock('${p.id}',-1)">➖</button>
+            </div>
+            `;
+        });
+    });
+}
+
+
+function getCategoryLabel(cat){
+
+    if(cat === "Getraenk") return "🍺 Getränke";
+    if(cat === "Essen") return "🍔 Essen";
+    if(cat === "Verbrauch") return "📦 Verbrauch";
+
+    return cat;
+}
+
 
     // Rendering
     Object.keys(categories).forEach(cat => {
