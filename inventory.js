@@ -466,6 +466,38 @@ async function returnItem(productId){
 
     alert("✅ Zurückgegeben");
 }
+async function showLoans(){
+
+    let res = await graph(`/sites/${siteId}/lists/${loansId}/items?expand=fields`);
+
+    let list = res.value || [];
+
+    // nach Datum sortieren (neueste zuerst)
+    list.sort((a,b)=>
+        new Date(b.fields.timestamp) - new Date(a.fields.timestamp)
+    );
+
+    let html = "<h2>📋 Verleih Übersicht</h2>";
+
+    list.forEach(x => {
+
+        let f = x.fields;
+
+        let date = new Date(f.timestamp).toLocaleString("de-DE");
+
+        html += `
+        <div class="card">
+            <b>${f.product}</b><br>
+            👤 ${f.person}<br>
+            📦 ${f.quantity}<br>
+            ${f.action === "out" ? "📤 Verliehen" : "📥 Zurück"}<br>
+            🕒 ${date}
+        </div>
+        `;
+    });
+
+    document.getElementById("products").innerHTML = html;
+}
 
 // ===============================
 init();
