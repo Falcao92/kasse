@@ -190,17 +190,19 @@ async function createProduct(){
 
     try {
 
-        let title = document.getElementById("title").value;
+        let title = document.getElementById("title").value.trim();
+
         let price = parseFloat(document.getElementById("price").value) || 0;
         let stock = parseFloat(document.getElementById("stock").value) || 0;
         let minstock = parseFloat(document.getElementById("minstock").value) || 0;
+
         let type = document.getElementById("type").value;
 
-        let recipe = null;
+        let recipe = "";
 
         if(type === "composite"){
             let r = getRecipeData();
-            recipe = (r !== "[]") ? r : null;
+            recipe = (r !== "[]") ? r : "";
         }
 
         await graph(
@@ -223,10 +225,11 @@ async function createProduct(){
         loadProducts();
 
     } catch(e){
-        console.error(e);
+        console.error("FEHLER:", e);
         alert("❌ Fehler – siehe Konsole");
     }
 }
+
 
 // ===============================
 // RECIPE BUILDER
