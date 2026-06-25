@@ -104,12 +104,10 @@ input, select, button {
 <button onclick="createProduct()">✅ Speichern</button>
 
 <div class="card">
-<h3>📅 Verleih / Reservierung</h3>
+<h3>📦 Verleih / Reservierung</h3>
 
 <select id="loanProduct"></select>
-
 <input id="loanPerson" placeholder="Name">
-
 <input id="loanQty" type="number" placeholder="Menge">
 
 <label>Von:</label>
@@ -118,17 +116,17 @@ input, select, button {
 <label>Bis:</label>
 <input id="loanEnd" type="date">
 
-<br>
+<br><br>
+
 <button onclick="lendFromUI()">📤 Ausleihen / Reservieren</button>
+<br><br>
+
+<button onclick="showLoans()">📋 Verlauf</button>
+<button onclick="showOpenLoans()">📦 Offen</button>
+<button onclick="showReservations()">📅 Reservierungen</button>
+<button onclick="renderProducts()">🔙 Inventar</button>
 
 </div>
-
-  
-</div>
-  <br><br>
-<button onclick="showLoans()">📋 Verleih ansehen</button>
-  <button onclick="showOpenLoans()">📦 Offene Ausleihen</button>
-  <button onclick="renderProducts()">🔙 Inventar</button>
 <!-- ✅ FILTER -->
 <div class="card">
 
