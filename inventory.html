@@ -10,7 +10,6 @@ body {
   background: #f5f5f5;
 }
 
-/* CARD */
 .card {
   background: white;
   padding: 15px;
@@ -19,14 +18,12 @@ body {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-/* GRID */
 .productGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
 }
 
-/* PRODUCT CARD */
 .productItem {
   background: white;
   padding: 10px;
@@ -38,7 +35,6 @@ body {
   background: #ffd6d6;
 }
 
-/* ACCORDION */
 .category {
   margin: 15px 10px;
 }
@@ -57,7 +53,6 @@ body {
   padding-top: 10px;
 }
 
-/* INPUTS */
 input, select, button {
   margin: 5px;
   padding: 6px;
@@ -67,10 +62,9 @@ input, select, button {
   display: flex;
   gap: 5px;
 }
-
 </style>
 
-<!-- ✅ MSAL -->
+<!-- ✅ FIXED MSAL -->
 <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 
 </head>
@@ -87,7 +81,6 @@ input, select, button {
 <input id="price" type="number" placeholder="Preis">
 <input id="stock" type="number" placeholder="Bestand">
 
-<!-- ✅ WIRD DYNAMISCH AUSGEBLENDET -->
 <input id="minstock" type="number" placeholder="Mindestbestand">
 
 <select id="type">
@@ -102,16 +95,16 @@ input, select, button {
   <option value="Verbrauch">Verbrauch</option>
 </select>
 
-<h3>Rezept</h3>
+<h3 id="recipeTitle">Rezept</h3>
 <div id="recipe"></div>
-<button onclick="addRecipeLine()">+ Zutat</button>
+<button id="recipeBtn" onclick="addRecipeLine()">+ Zutat</button>
 
 <br><br>
 <button onclick="createProduct()">✅ Speichern</button>
 
 </div>
 
-<!-- ✅ FILTER + SUCHE -->
+<!-- ✅ FILTER -->
 <div class="card">
 
 <input id="search" placeholder="🔍 Produkt suchen..." oninput="renderProducts()">
@@ -130,38 +123,46 @@ input, select, button {
 <script src="inventory.js"></script>
 
 <script>
-// ✅ ACCORDION
+// ✅ Accordion
 function toggleCategory(id){
     let el = document.getElementById(id);
     el.style.display = el.style.display === "block" ? "none" : "block";
 }
 
-// ✅ NEU: Typ-Logik (Asset ohne Mindestbestand)
+// ✅ Typ-Steuerung (wichtig!)
 document.addEventListener("DOMContentLoaded", function(){
 
     let typeSelect = document.getElementById("type");
     let minInput = document.getElementById("minstock");
 
-    typeSelect.addEventListener("change", function(){
+    let recipe = document.getElementById("recipe");
+    let recipeBtn = document.getElementById("recipeBtn");
+    let recipeTitle = document.getElementById("recipeTitle");
 
-        if(this.value === "asset"){
+    function updateUI(){
+
+        // ✅ Asset = kein Mindestbestand
+        if(typeSelect.value === "asset"){
             minInput.style.display = "none";
         } else {
             minInput.style.display = "inline-block";
         }
 
-        // Rezept nur für composite sinnvoll
-        let recipeSection = document.getElementById("recipe").parentElement;
-
-        if(this.value === "composite"){
-            recipeSection.style.display = "block";
+        // ✅ Rezept nur bei composite
+        if(typeSelect.value === "composite"){
+            recipe.style.display = "block";
+            recipeBtn.style.display = "inline-block";
+            recipeTitle.style.display = "block";
         } else {
-            recipeSection.style.display = "none";
+            recipe.style.display = "none";
+            recipeBtn.style.display = "none";
+            recipeTitle.style.display = "none";
         }
-    });
+    }
 
-    // Initialzustand setzen
-    typeSelect.dispatchEvent(new Event("change"));
+    typeSelect.addEventListener("change", updateUI);
+
+    updateUI();
 });
 </script>
 
