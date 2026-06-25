@@ -105,6 +105,9 @@ async function init(){
 // ===============================
 // LOAD PRODUCTS
 // ===============================
+// ===============================
+// LOAD PRODUCTS
+// ===============================
 async function loadProducts(){
 
     let res = await graph(`/sites/${siteId}/lists/${inventoryId}/items?expand=fields`);
@@ -112,7 +115,24 @@ async function loadProducts(){
     products = res.value || [];
 
     renderProducts();
+    fillLoanDropdown();   // ✅ korrekt hier aufrufen
 }
+
+
+
+// ✅ SEPARATE FUNKTION (WICHTIG!)
+function fillLoanDropdown(){
+
+    let select = document.getElementById("loanProduct");
+
+    if(!select) return;
+
+    select.innerHTML = products
+        .filter(p => p.fields.type === "asset")
+        .map(p => `<option value="${p.id}">${p.fields.Title}</option>`)
+        .join("");
+}
+
 
 // ===============================
 // RENDER
@@ -651,5 +671,85 @@ async function lendItem(productId){
     alert("✅ Vorgang gespeichert");
 }
 
+async function lendFromUI(){
+
+    let id = document.getElementById("loanProduct").value;
+    let person = document.getElementById("loanPerson").value;
+    let qty = Number(document.getElementById("loanQty").value) || 1;
+    let start = document.getElementById("loanStart").value;
+    let end = document.getElementById("loanEnd").value;
+
+    if(!person || !start){
+        alert("Name und Startdatum fehlt");
+        return;
+    }
+
+    let p = products.find(x => x.id === id);
+
+    let today = new Date().toISOString().slice(0,10);
+
+    if(start === today){
+        let stock = p.fields.stock || 0;
+
+        if(stock < qty){
+            alert("Nicht genug Bestand!");
+            return;
+        }
+
+        await changeStock(id, -qty);
+    }
+
+    await graph(
+        `/sites/${siteId}/lists/${loansId}/items`,
+        "POST",
+        {
+            fields:{
+                Title: "Loan",
+                product: p.fields.Title,
+                person: person,
+                quantity: qty,
+                action: "out",
+                startDate: start,
+                endDate: end,
+                timestamp: new Date().toISOString()
+            }
+        }
+    );
+
+    alert("✅ gespeichert");
+}
+
+async function showReservations(){
+
+    let res = await graph(`/sites/${siteId}/lists/${loansId}/items?expand=fields`);
+
+    let data = res.value || [];
+
+    let today = new Date().toISOString().slice(0,10);
+
+    let html = "<h2>📅 Reservierungen</h2>";
+
+    data.forEach(x => {
+
+        let f = x.fields;
+
+        if(!f.startDate) return;
+
+        // Zukunft = Reservierung
+        if(f.startDate > today){
+
+            html += `
+            <div class="card">
+                <b>${f.product}</b><br>
+                👤 ${f.person}<br>
+                📦 ${f.quantity}<br>
+                📅 ${f.startDate} ${f.endDate ? "→ " + f.endDate : ""}
+            </div>
+            `;
+        }
+    });
+
+    document.getElementById("products").innerHTML = html;
+}
 // ===============================
 init();
