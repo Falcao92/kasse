@@ -101,26 +101,58 @@ function renderProducts(){
     let container = document.getElementById("products");
     container.innerHTML = "";
 
+    let categories = {
+        "Getraenk": [],
+        "Essen": [],
+        "Verbrauch": []
+    };
+
+    // Produkte sortieren
     products.forEach(p => {
-
         let f = p.fields;
+        let cat = f.category || "Verbrauch";
 
-        let low = isLowStock(p) ? "low" : "";
+        if(!categories[cat]){
+            categories[cat] = [];
+        }
+
+        categories[cat].push(p);
+    });
+
+    // Rendering
+    Object.keys(categories).forEach(cat => {
+
+        let id = "cat_" + cat;
 
         container.innerHTML += `
-        <div class="card ${low}">
-            <h3>${f.Title}</h3>
-            <p>Bestand: ${f.stock || 0}</p>
-            <p>Min: ${f.minstock || 0}</p>
-
-            ${renderRecipe(p)}
-
-            <button onclick="changeStock('${p.id}',1)">➕</button>
-            <button onclick="changeStock('${p.id}',-1)">➖</button>
-
-            ${isLowStock(p) ? "<b>⚠️ Nachbestellen!</b>" : ""}
+        <div class="category">
+            <div class="categoryHeader" onclick="toggleCategory('${id}')">
+                ${cat}
+            </div>
+            <div id="${id}" class="categoryContent">
+                <div class="productGrid" id="${id}_grid"></div>
+            </div>
         </div>
         `;
+
+        let grid = document.getElementById(id + "_grid");
+
+        categories[cat].forEach(p => {
+
+            let f = p.fields;
+            let low = isLowStock(p) ? "low" : "";
+
+            grid.innerHTML += `
+            <div class="productItem ${low}">
+                <b>${f.Title}</b><br>
+                Bestand: ${f.stock || 0}<br>
+                Min: ${f.minstock || 0}<br>
+
+                <button onclick="changeStock('${p.id}',1)">➕</button>
+                <button onclick="changeStock('${p.id}',-1)">➖</button>
+            </div>
+            `;
+        });
     });
 }
 
@@ -195,6 +227,7 @@ async function createProduct(){
         let stock = Number(document.getElementById("stock").value) || 0;
         let minstock = Number(document.getElementById("minstock").value) || 0;
         let type = document.getElementById("type").value;
+let category = document.getElementById("category").value;
 
         let recipe = "";
 
@@ -214,7 +247,8 @@ async function createProduct(){
                 stock: stock,
                 minstock: minstock,
                 type: type,
-                recipe: recipe
+                recipe: recipe,
+                category: category
             }
         };
 
