@@ -499,5 +499,58 @@ async function showLoans(){
     document.getElementById("products").innerHTML = html;
 }
 
+async function showOpenLoans(){
+
+    let res = await graph(`/sites/${siteId}/lists/${loansId}/items?expand=fields`);
+
+    let data = res.value || [];
+
+    let summary = {};
+
+    data.forEach(x => {
+
+        let f = x.fields;
+
+        let key = f.person + "|" + f.product;
+
+        if(!summary[key]){
+            summary[key] = {
+                person: f.person,
+                product: f.product,
+                qty: 0
+            };
+        }
+
+        if(f.action === "out"){
+            summary[key].qty += Number(f.quantity || 0);
+        }
+
+        if(f.action === "back"){
+            summary[key].qty -= Number(f.quantity || 0);
+        }
+    });
+
+    let html = "<h2>📦 Offene Ausleihen</h2>";
+
+    Object.values(summary)
+        .filter(x => x.qty > 0)
+        .forEach(x => {
+
+            html += `
+            <div class="card">
+                <b>${x.product}</b><br>
+                👤 ${x.person}<br>
+                📦 Offen: ${x.qty}
+            </div>
+            `;
+        });
+
+    if(html === "<h2>📦 Offene Ausleihen</h2>"){
+        html += "✅ Alles zurückgegeben!";
+    }
+
+    document.getElementById("products").innerHTML = html;
+}
+
 // ===============================
 init();
